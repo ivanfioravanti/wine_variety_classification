@@ -78,7 +78,7 @@ def call_model(model_name, prompt, timeout=5, max_retries=3):
         executor = None
         future = None
         try:
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             future = executor.submit(_generate)
             variety = future.result(timeout=timeout)  # This will raise TimeoutError if it takes too long
             

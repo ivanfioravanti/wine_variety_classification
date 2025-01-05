@@ -8,11 +8,10 @@ import glob
 import argparse
 
 # Import all wine analysis modules
-from providers import wine_gemini_openai
 from providers import wine_anthropic
 from providers import wine_ollama
 from providers import wine_openai
-from providers import wine_gemini
+from providers import wine_gemini_genai
 from providers import wine_openrouter
 from providers import wine_lmstudio
 from providers import wine_deepseek
@@ -79,11 +78,10 @@ def run_all_models():
     
     # List of all modules and their models
     module_models = [
-        #(wine_gemini_openai, ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]),
         (wine_anthropic, ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]),
         (wine_ollama, ["llama3.1:latest", "llama3.2:latest", "llama3.3:latest", "qwen2.5:72b-instruct"],),
         (wine_openai, ["gpt-4o", "gpt-4o-mini"]),
-        (wine_gemini, ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]),
+        (wine_gemini_genai, ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]),
         (wine_openrouter, ["deepseek/deepseek-chat"]),
         (wine_lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),
         (wine_deepseek, ["deepseek-chat"])
@@ -153,7 +151,7 @@ if __name__ == "__main__":
             (wine_anthropic, ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]),
             (wine_ollama, ["llama3.1:latest", "llama3.2:latest", "llama3.3:latest", "qwen2.5:72b-instruct"],),
             (wine_openai, ["gpt-4o", "gpt-4o-mini"]),
-            (wine_gemini, ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]),
+            (wine_gemini_genai, ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]),
             (wine_openrouter, ["deepseek/deepseek-chat"]),
             (wine_lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),
             (wine_deepseek, ["deepseek-chat"])
