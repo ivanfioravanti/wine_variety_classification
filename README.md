@@ -1,8 +1,23 @@
 # Wine Variety Prediction with LLMs
 
-![Wine Variety Prediction](./images/guss_the_wine.webp)
+![Wine Variety Prediction](./images/guess_the_wine.webp)
 
-This project demonstrates how to use various Large Language Models (LLMs) to predict wine varieties based on wine reviews and characteristics. It's inspired by OpenAI's model distillation cookbook but focuses on comparing different models' performance without distillation.
+This project demonstrates how to use various Large Language Models (LLMs) to predict wine varieties based on wine reviews and characteristics. It's inspired by [OpenAI's model distillation cookbook](https://cookbook.openai.com/examples/leveraging_model_distillation_to_fine-tune_a_model) but focuses on comparing different models' performance without distillation.
+
+The goal is using native API for each provider where possible for this classification task.
+Main focus is on local models through Ollama with llama.cpp and LM Studio with MLX.
+
+## Results first
+I ran the tests on Italian wines first and then French wines later to see if there was any difference in performance.
+And...
+- French wines are easier to predict than Italian wines!
+- Anthropic models are the best performing classification models out there! Including Claude 3.5 Haiku.
+
+Here is the chart for Italian wines:
+![Italian Wine Results](./results/accuracy_chart_20250105_095642.png)
+
+Here is the chart for French wines:
+![French Wine Results](./results/accuracy_chart_20250105_115642.png)
 
 ## Overview
 
@@ -26,14 +41,6 @@ The project uses a dataset of Italian wines to test different LLMs' ability to p
 
 - Python 3.12+
 - Jupyter Notebook
-- Required Python packages:
-  ```
-  ollama
-  numpy
-  pandas
-  tqdm
-  pydantic
-  ```
 - API keys for various providers (store in `.env` file):
   - OPENAI_API_KEY
   - GEMINI_API_KEY
@@ -132,6 +139,12 @@ Initial testing shows varying performance between models. For example:
 - llama3.2: 49.20% accuracy
 
 Results may vary based on the specific models and configurations used.
+
+## TODO
+
+- [ ] Test google-genai python package for Gemini
+- [ ] Try [MLX Omni Server](https://github.com/madroidmaq/mlx-omni-server) for Apple MLX tests
+- [ ] Fine tune models with MLX with distillation (Llama 3.2) 
 
 ## Contributing
 
