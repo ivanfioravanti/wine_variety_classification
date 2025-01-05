@@ -29,13 +29,14 @@ The project uses a dataset of Italian wines to test different LLMs' ability to p
 ## Features
 
 - Wine variety prediction using multiple LLM providers:
-  - Ollama (llama2)
-  - OpenAI
-  - Google Gemini
-  - LM Studio
-  - OpenRouter
-  - DeepSeek
-  - Anthropic
+  - [Ollama](https://ollama.ai)
+  - [OpenAI](https://openai.com)
+  - [Google Gemini](https://gemini.google.com)
+  - [LM Studio](https://lmstudio.ai)
+  - [OpenRouter](https://openrouter.ai)
+  - [DeepSeek](https://deepseek.com)
+  - [Anthropic](https://anthropic.com)
+  - [MLX Omni Server](https://github.com/madroidmaq/mlx-omni-server)
 - Structured Output implementation for consistent responses (where possible)
 - Performance comparison between different models
 - Support for parallel processing with some providers
@@ -90,6 +91,7 @@ In the providers folder you will find the individual implementations for each pr
 - `wine_deepseek.py` - Implementation using DeepSeek
 - `wine_anthropic.py` - Implementation using Anthropic
 - `wine_openai.py` - Implementation using OpenAI
+- `wine_mlx_omni_server.py` - Implementation using MLX Omni Server
 
 ## Usage
 
@@ -146,8 +148,11 @@ Results may vary based on the specific models and configurations used.
 ## TODO
 
 - [ ] Test google-genai python package for Gemini
-- [ ] Try [MLX Omni Server](https://github.com/madroidmaq/mlx-omni-server) for Apple MLX tests
 - [ ] Fine tune models with MLX with distillation (Llama 3.2) 
+
+## DONE
+
+- [x] Try [MLX Omni Server](https://github.com/madroidmaq/mlx-omni-server) for Apple MLX tests
 
 ## Contributing
 
