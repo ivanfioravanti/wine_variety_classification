@@ -13,10 +13,13 @@ And...
 - French wines are easier to predict than Italian wines!
 - Anthropic models are the best performing classification models out there! Including Claude 3.5 Haiku.
 
-Here is the chart for Italian wines:
-![Italian Wine Results](./results/accuracy_chart_20250105_095642.png)
+Here is the chart that compares Italian and French results:
+![Comparison chart](./images/italy_france_comparison.png)
 
-Here is the chart for French wines:
+Here is the detailed chart for Italian wines:
+![Italian Wine Results](./results/accuracy_chart_20250105_095642.png) 
+
+Here is the detailed chart for French wines:
 ![French Wine Results](./results/accuracy_chart_20250105_115642.png)
 
 ## Overview
