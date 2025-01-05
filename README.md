@@ -1,5 +1,7 @@
 # Wine Variety Prediction with LLMs
 
+![Wine Variety Prediction](./images/guss_the_wine.webp)
+
 This project demonstrates how to use various Large Language Models (LLMs) to predict wine varieties based on wine reviews and characteristics. It's inspired by OpenAI's model distillation cookbook but focuses on comparing different models' performance without distillation.
 
 ## Overview
@@ -68,10 +70,16 @@ The project uses the [Wine Reviews dataset](https://www.kaggle.com/datasets/zyni
 ## Project Structure
 
 - `wine.ipynb` - Main Jupyter notebook with code and explanations
+- `wine_all.py` - Implementation using all providers
+
+In the providers folder you will find the individual implementations for each provider.
 - `wine_openrouter.py` - Implementation using OpenRouter API
 - `wine_ollama.py` - Implementation using Ollama
 - `wine_gemini.py` - Implementation using Google Gemini
 - `wine_lmstudio.py` - Implementation using LM Studio
+- `wine_deepseek.py` - Implementation using DeepSeek
+- `wine_anthropic.py` - Implementation using Anthropic
+- `wine_openai.py` - Implementation using OpenAI
 
 ## Usage
 
