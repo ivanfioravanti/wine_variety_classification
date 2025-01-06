@@ -109,6 +109,9 @@ In the providers folder you will find the individual implementations for each pr
 You can run individual provider modules directly using Python's module syntax:
 
 ```bash
+# Run MLX Omni Server provider
+python -m providers.wine_mlx_omni_server
+
 # Run Ollama provider
 python -m providers.wine_ollama
 
@@ -137,22 +140,17 @@ python wine_all.py --generate-chart --summary SUMMARY_FILE    # Generate chart f
 python wine_all.py --no-provider-csv                         # Run tests but don't save individual provider results to CSV files
 ```
 
-## Model Performance
-
-Initial testing shows varying performance between models. For example:
-- llama3.1: 61.60% accuracy
-- llama3.2: 49.20% accuracy
-
-Results may vary based on the specific models and configurations used.
+## Fine-tuning models with MLX
+See [LORA.md](LORA.md) for instructions on how to fine-tune models using LoRA with MLX.
 
 ## TODO
 
 - [ ] Test google-genai python package for Gemini
-- [ ] Fine tune models with MLX with distillation (Llama 3.2) 
 
 ## DONE
 
 - [x] Try [MLX Omni Server](https://github.com/madroidmaq/mlx-omni-server) for Apple MLX tests
+- [x] Fine tune models with MLX with distillation (Phi-3.5-mini-instruct) 
 
 ## Contributing
 

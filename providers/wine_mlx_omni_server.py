@@ -6,7 +6,7 @@ import pandas as pd
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Define default models for mlx_omni_server provider
-DEFAULT_MODELS = ["mlx-community/Llama-3.2-3B-Instruct-4bit"]
+DEFAULT_MODELS = ["mlx-community/Dolphin3.0-Llama3.1-8B-6bit"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -70,7 +70,6 @@ response_format = {
 def call_model(model, prompt):
     response = client.chat.completions.create(
         model=model,
-        store=True,
         messages=[
             {
                 "role": "system",

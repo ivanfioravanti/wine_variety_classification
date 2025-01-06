@@ -31,6 +31,8 @@ ENV/
 
 # Project specific
 /results/providers*
+/adapters
+/train/data
 
 # Logs
 *.log
