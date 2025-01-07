@@ -55,20 +55,22 @@ def generate_prompt(row, varieties):
     """
     return prompt
 
+
 class WineVariety(BaseModel):
     variety: str = Field(enum=varieties.tolist())
+
 
 # Function to call the API and process the result for a single model
 def call_model(model_name, prompt, timeout=5, max_retries=3):
     def _generate():
         response = client.models.generate_content(
-            model = model_name,
+            model=model_name,
             contents=prompt,
             config=types.GenerateContentConfig(
-                response_mime_type= 'application/json',
+                response_mime_type="application/json",
                 system_instruction="You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
-                temperature= 0,
-                response_schema= WineVariety,
+                temperature=0,
+                response_schema=WineVariety,
             ),
         )
         return json.loads(response.text.strip())["variety"]
@@ -80,19 +82,25 @@ def call_model(model_name, prompt, timeout=5, max_retries=3):
         try:
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             future = executor.submit(_generate)
-            variety = future.result(timeout=timeout)  # This will raise TimeoutError if it takes too long
-            
+            variety = future.result(
+                timeout=timeout
+            )  # This will raise TimeoutError if it takes too long
+
             # Validate that the variety is in our list
             if variety in varieties:
                 return variety
             retries += 1  # Count invalid responses as retries
-                
+
         except concurrent.futures.TimeoutError:
-            print(f"Timeout error for model {model_name}: Request took longer than {timeout} seconds (attempt {retries + 1}/{max_retries})")
+            print(
+                f"Timeout error for model {model_name}: Request took longer than {timeout} seconds (attempt {retries + 1}/{max_retries})"
+            )
             retries += 1
             time.sleep(1)  # Add a small delay before retrying
         except Exception as e:
-            print(f"Error processing model {model_name}: {str(e)} (attempt {retries + 1}/{max_retries})")
+            print(
+                f"Error processing model {model_name}: {str(e)} (attempt {retries + 1}/{max_retries})"
+            )
             retries += 1
             time.sleep(1)  # Add a small delay before retrying
         finally:
@@ -101,7 +109,7 @@ def call_model(model_name, prompt, timeout=5, max_retries=3):
                 future.cancel()
             if executor is not None:
                 executor.shutdown(wait=False)
-    
+
     raise Exception(f"Failed to get valid response after {max_retries} attempts")
 
 
@@ -159,7 +167,7 @@ def run_provider(models=None):
     """
     models_to_use = models if models is not None else DEFAULT_MODELS
     results = {}
-    
+
     for model in models_to_use:
         print(f"Processing with {model}...")
         df = process_dataframe(df_country_subset.copy(), model)
@@ -167,11 +175,12 @@ def run_provider(models=None):
         results[model] = {
             "accuracy": accuracy,
             "sample_size": len(df),
-            "country": COUNTRY
+            "country": COUNTRY,
         }
         print(f"{model} accuracy: {accuracy * 100:.2f}%")
-    
+
     return df, results
+
 
 if __name__ == "__main__":
     run_provider()

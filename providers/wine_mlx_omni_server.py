@@ -3,10 +3,18 @@ import json
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import argparse
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
+# Parse command line arguments
+parser = argparse.ArgumentParser(
+    description="Wine variety classification using MLX Omni Server"
+)
+parser.add_argument("--adapter-path", type=str, help="Path to fine-tuned adapter")
+args = parser.parse_args()
+
 # Define default models for mlx_omni_server provider
-DEFAULT_MODELS = ["mlx-community/Dolphin3.0-Llama3.1-8B-6bit"]
+DEFAULT_MODELS = ["ivanfioravanti/Mistral-7B-Instruct-v0.3-italian-wine"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -68,17 +76,24 @@ response_format = {
 
 # Function to call the API and process the result for a single model (blocking call in this case)
 def call_model(model, prompt):
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
+    kwargs = {
+        "model": model,
+        "messages": [
             {
                 "role": "system",
                 "content": "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
             },
             {"role": "user", "content": prompt},
         ],
-        response_format=response_format,
-    )
+        "response_format": response_format,
+    }
+
+    if args.adapter_path:
+        kwargs["extra_body"] = {
+            "adapter_path": args.adapter_path,  # Path to fine-tuned adapter
+        }
+
+    response = client.chat.completions.create(**kwargs)
     return json.loads(response.choices[0].message.content.strip())["variety"]
 
 
@@ -129,7 +144,7 @@ def run_provider(models=None):
     """
     models_to_use = models if models is not None else DEFAULT_MODELS
     results = {}
-    
+
     for model in models_to_use:
         print(f"Processing with {model}...")
         df = process_dataframe(df_country_subset.copy(), model)
@@ -137,11 +152,12 @@ def run_provider(models=None):
         results[model] = {
             "accuracy": accuracy,
             "sample_size": len(df),
-            "country": COUNTRY
+            "country": COUNTRY,
         }
         print(f"{model} accuracy: {accuracy * 100:.2f}%")
-    
+
     return df, results
+
 
 if __name__ == "__main__":
     run_provider()

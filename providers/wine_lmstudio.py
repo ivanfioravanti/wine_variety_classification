@@ -130,7 +130,7 @@ def run_provider(models=None):
     """
     models_to_use = models if models is not None else DEFAULT_MODELS
     results = {}
-    
+
     for model in models_to_use:
         print(f"Processing with {model}...")
         df = process_dataframe(df_country_subset.copy(), model)
@@ -138,11 +138,12 @@ def run_provider(models=None):
         results[model] = {
             "accuracy": accuracy,
             "sample_size": len(df),
-            "country": COUNTRY
+            "country": COUNTRY,
         }
         print(f"{model} accuracy: {accuracy * 100:.2f}%")
-    
+
     return df, results
+
 
 if __name__ == "__main__":
     run_provider()

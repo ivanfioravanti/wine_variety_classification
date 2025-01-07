@@ -13,7 +13,7 @@ from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 DEFAULT_MODELS = [
     "claude-3-5-haiku-20241022",
     "claude-3-5-sonnet-20241022",
-    "claude-3-opus-20240229"
+    "claude-3-opus-20240229",
 ]
 
 # Load environment variables from .env file
@@ -140,7 +140,7 @@ def run_provider(models=None):
     """
     models_to_use = models if models is not None else DEFAULT_MODELS
     results = {}
-    
+
     for model in models_to_use:
         print(f"Processing with {model}...")
         df = process_dataframe(df_country_subset.copy(), model)
@@ -148,10 +148,10 @@ def run_provider(models=None):
         results[model] = {
             "accuracy": accuracy,
             "sample_size": len(df),
-            "country": COUNTRY
+            "country": COUNTRY,
         }
         print(f"{model} accuracy: {accuracy * 100:.2f}%")
-    
+
     return df, results
 
 

@@ -6,8 +6,14 @@ import random
 import argparse
 
 # Set up argument parser
-parser = argparse.ArgumentParser(description='Generate training data for wine variety classification')
-parser.add_argument('--all-countries', action='store_true', help='Process wines from all countries instead of filtering by country')
+parser = argparse.ArgumentParser(
+    description="Generate training data for wine variety classification"
+)
+parser.add_argument(
+    "--all-countries",
+    action="store_true",
+    help="Process wines from all countries instead of filtering by country",
+)
 args = parser.parse_args()
 
 # Load the wine dataset
@@ -31,30 +37,29 @@ varieties_less_than_five_list = (
 )
 df_filtered = df_filtered[~df_filtered["variety"].isin(varieties_less_than_five_list)]
 
+
 def create_wine_sample(row):
     # Handle potential missing values with empty strings to avoid None errors
-    winery = row.get('winery', '')
-    province = row.get('province', '')
-    country = row.get('country', '')
-    region_1 = row.get('region_1', '')
-    description = row.get('description', '')
-    taster_name = row.get('taster_name', '')
-    points = row.get('points', '')
-    price = row.get('price', '')
-    
+    winery = row.get("winery", "")
+    province = row.get("province", "")
+    country = row.get("country", "")
+    region_1 = row.get("region_1", "")
+    description = row.get("description", "")
+    taster_name = row.get("taster_name", "")
+    points = row.get("points", "")
+    price = row.get("price", "")
+
     prompt = f"""Based on this wine review, guess the grape variety:
 This wine is produced by {winery} in the {province} region of {country}.
 It was grown in {region_1}. It is described as: "{description}".
 The wine has been reviewed by {taster_name} and received {points} points.
 The price is {price}"""
-    
+
     completion_template = {
         "variety": row["variety"],
     }
-    return {
-        "prompt": prompt,
-        "completion": json.dumps(completion_template)
-    }
+    return {"prompt": prompt, "completion": json.dumps(completion_template)}
+
 
 print("Processing wine data...")
 all_data = [create_wine_sample(row) for _, row in df_filtered.iterrows()]
@@ -68,30 +73,36 @@ valid_size = total_size - train_size - test_size
 
 # Split the data
 new_train_data = all_data[:train_size]
-new_test_data = all_data[train_size:train_size+test_size]
-new_valid_data = all_data[train_size+test_size:]
+new_test_data = all_data[train_size : train_size + test_size]
+new_valid_data = all_data[train_size + test_size :]
+
 
 # Write to JSONL files
 def write_jsonl(data, filename):
-    with open(filename, 'w') as f:
+    with open(filename, "w") as f:
         for item in data:
-            f.write(json.dumps(item) + '\n')
+            f.write(json.dumps(item) + "\n")
+
 
 print("Writing train.jsonl...")
 folder_prefix = "./train/data/"
 os.makedirs(folder_prefix, exist_ok=True)
-write_jsonl(new_train_data, folder_prefix+'train.jsonl')
+write_jsonl(new_train_data, folder_prefix + "train.jsonl")
 print("Writing test.jsonl...")
-write_jsonl(new_test_data, folder_prefix+'test.jsonl')
+write_jsonl(new_test_data, folder_prefix + "test.jsonl")
 print("Writing valid.jsonl...")
-write_jsonl(new_valid_data, folder_prefix+'valid.jsonl')
+write_jsonl(new_valid_data, folder_prefix + "valid.jsonl")
 
-print(f"Dataset split and saved: train ({len(new_train_data)}), test ({len(new_test_data)}), valid ({len(new_valid_data)})")
+print(
+    f"Dataset split and saved: train ({len(new_train_data)}), test ({len(new_test_data)}), valid ({len(new_valid_data)})"
+)
+
 
 # Verify file contents
 def count_lines(filename):
-    with open(folder_prefix+filename, 'r') as f:
+    with open(folder_prefix + filename, "r") as f:
         return sum(1 for _ in f)
+
 
 print("\nVerifying file contents:")
 print(f"train.jsonl: {count_lines('train.jsonl')} lines")

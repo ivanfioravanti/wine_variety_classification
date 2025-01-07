@@ -65,7 +65,7 @@ def call_model(model_name, prompt, timeout=5, max_retries=3):
             generation_config={
                 "temperature": 0,  # Use deterministic output
                 "candidate_count": 1,
-            }
+            },
         )
         return response.text.strip()
 
@@ -76,19 +76,25 @@ def call_model(model_name, prompt, timeout=5, max_retries=3):
         try:
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             future = executor.submit(_generate)
-            variety = future.result(timeout=timeout)  # This will raise TimeoutError if it takes too long
-            
+            variety = future.result(
+                timeout=timeout
+            )  # This will raise TimeoutError if it takes too long
+
             # Validate that the variety is in our list
             if variety in varieties:
                 return variety
             retries += 1  # Count invalid responses as retries
-                
+
         except concurrent.futures.TimeoutError:
-            print(f"Timeout error for model {model_name}: Request took longer than {timeout} seconds (attempt {retries + 1}/{max_retries})")
+            print(
+                f"Timeout error for model {model_name}: Request took longer than {timeout} seconds (attempt {retries + 1}/{max_retries})"
+            )
             retries += 1
             time.sleep(1)  # Add a small delay before retrying
         except Exception as e:
-            print(f"Error processing model {model_name}: {str(e)} (attempt {retries + 1}/{max_retries})")
+            print(
+                f"Error processing model {model_name}: {str(e)} (attempt {retries + 1}/{max_retries})"
+            )
             retries += 1
             time.sleep(1)  # Add a small delay before retrying
         finally:
@@ -97,7 +103,7 @@ def call_model(model_name, prompt, timeout=5, max_retries=3):
                 future.cancel()
             if executor is not None:
                 executor.shutdown(wait=False)
-    
+
     raise Exception(f"Failed to get valid response after {max_retries} attempts")
 
 
@@ -155,7 +161,7 @@ def run_provider(models=None):
     """
     models_to_use = models if models is not None else DEFAULT_MODELS
     results = {}
-    
+
     for model in models_to_use:
         print(f"Processing with {model}...")
         df = process_dataframe(df_country_subset.copy(), model)
@@ -163,11 +169,12 @@ def run_provider(models=None):
         results[model] = {
             "accuracy": accuracy,
             "sample_size": len(df),
-            "country": COUNTRY
+            "country": COUNTRY,
         }
         print(f"{model} accuracy: {accuracy * 100:.2f}%")
-    
+
     return df, results
+
 
 if __name__ == "__main__":
     run_provider()

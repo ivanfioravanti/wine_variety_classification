@@ -33,6 +33,7 @@ ENV/
 /results/providers*
 /adapters
 /train/data
+/fused_model
 
 # Logs
 *.log

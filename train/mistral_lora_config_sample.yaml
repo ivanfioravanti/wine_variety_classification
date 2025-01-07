@@ -1,0 +1,72 @@
+
+
+# The path to the local model directory or Hugging Face repo.
+model: "mistralai/Mistral-7B-Instruct-v0.3"
+# Whether or not to train (boolean)
+train: true
+
+# Directory with {train, valid, test}.jsonl files
+data: "./train/data"
+
+# The PRNG seed
+seed: 0
+
+fine_tune_type: lora
+
+# Number of layers to fine-tune
+num_layers: 16
+
+# Minibatch size.
+batch_size: 8
+
+# Iterations to train for.
+iters: 1000
+
+# Number of validation batches, -1 uses the entire validation set.
+val_batches: 25
+
+# Adam learning rate.
+learning_rate: 2e-5
+
+# Number of training steps between loss reporting.
+steps_per_report: 10
+
+# Number of training steps between validations.
+steps_per_eval: 200
+
+# Load path to resume training with the given adapter weights.
+resume_adapter_file: null
+
+# Save/load path for the trained adapter weights.
+adapter_path: "adapters"
+
+# Save the model every N iterations.
+save_every: 200
+
+# Evaluate on the test set after training
+test: false
+
+# Number of test set batches, -1 uses the entire test set.
+test_batches: 100
+
+# Maximum sequence length.
+max_seq_length: 2048
+
+# Use gradient checkpointing to reduce memory use.
+grad_checkpoint: true
+
+# LoRA parameters can only be specified in a config file
+lora_parameters:
+  # The layer keys to apply LoRA to.
+  # These will be applied for the last lora_layers
+  keys: ["self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj","mlp.down_proj","mlp.up_proj"]
+  rank: 64
+  scale: 1
+  dropout: 0
+
+# Schedule can only be specified in a config file, uncomment to use.
+lr_schedule:
+ name: cosine_decay
+ warmup: 100 # 0 for no warmup
+ warmup_init: 2e-4 # 0 if not specified
+ arguments: [2e-4, 1000, 1e-5] # passed to scheduler
