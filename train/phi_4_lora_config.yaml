@@ -1,0 +1,72 @@
+
+
+# The path to the local model directory or Hugging Face repo.
+model: "microsoft/phi-4"
+# Whether or not to train (boolean)
+train: true
+
+# Directory with {train, valid, test}.jsonl files
+data: "./train/data"
+
+# The PRNG seed
+seed: 0
+
+fine_tune_type: lora
+
+# Number of layers to fine-tune
+num_layers: 16
+
+# Minibatch size.
+batch_size: 8
+
+# Iterations to train for.
+iters: 4000
+
+# Number of validation batches, -1 uses the entire validation set.
+val_batches: 20
+
+# Adam learning rate.
+learning_rate: 2e-5
+
+# Number of training steps between loss reporting.
+steps_per_report: 10
+
+# Number of training steps between validations.
+steps_per_eval: 200
+
+# Load path to resume training with the given adapter weights.
+resume_adapter_file: null
+
+# Save/load path for the trained adapter weights.
+adapter_path: "adapters"
+
+# Save the model every N iterations.
+save_every: 300
+
+# Evaluate on the test set after training
+test: false
+
+# Number of test set batches, -1 uses the entire test set.
+test_batches: 100
+
+# Maximum sequence length.
+max_seq_length: 2048
+
+# Use gradient checkpointing to reduce memory use.
+grad_checkpoint: true
+
+# LoRA parameters can only be specified in a config file
+lora_parameters:
+  # The layer keys to apply LoRA to.
+  # These will be applied for the last lora_layers
+  keys: ["self_attn.o_proj","self_attn.qkv_proj"]
+  rank: 64
+  scale: 1 
+  dropout: 0
+
+# Schedule can only be specified in a config file, uncomment to use.
+lr_schedule:
+  name: cosine_decay
+  warmup: 60 
+  warmup_init: 1e-7
+  arguments: [1e-4, 2000, 1e-5] 
