@@ -103,8 +103,6 @@ def call_model(model, prompt):
 
 
 def process_example(index, row, model, df, progress_bar):
-    global progress_index
-
     try:
         # Generate the prompt using the row
         prompt = generate_prompt(row, varieties)
@@ -113,16 +111,11 @@ def process_example(index, row, model, df, progress_bar):
 
         # Update the progress bar
         progress_bar.update(1)
-
-        progress_index += 1
     except Exception as e:
         print(f"Error processing model {model}: {str(e)}")
 
 
 def process_dataframe(df, model):
-    global progress_index
-    progress_index = 1  # Reset progress index
-
     # Create a tqdm progress bar
     with tqdm(total=len(df), desc="Processing rows") as progress_bar:
         # Process each example concurrently using ThreadPoolExecutor with limited workers
@@ -156,19 +149,21 @@ def run_provider(models=None):
     """
     models_to_use = models if models is not None else DEFAULT_MODELS
     results = {}
+    final_df = None
 
     for model in models_to_use:
         print(f"Processing with {model}...")
-        df = process_dataframe(df_country_subset.copy(), model)
-        accuracy = get_accuracy(model, df)
+        working_df = process_dataframe(df_country_subset.copy(), model)
+        accuracy = get_accuracy(model, working_df)
         results[model] = {
             "accuracy": accuracy,
-            "sample_size": len(df),
+            "sample_size": len(working_df),
             "country": COUNTRY,
         }
         print(f"{model} accuracy: {accuracy * 100:.2f}%")
+        final_df = working_df if final_df is None else final_df
 
-    return df, results
+    return final_df, results
 
 
 if __name__ == "__main__":
