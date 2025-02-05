@@ -55,3 +55,4 @@ coverage.xml
 cover/ 
 data/*.csv
 data/*.json
+.aider*

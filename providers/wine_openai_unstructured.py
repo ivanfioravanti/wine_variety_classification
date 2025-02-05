@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Define default models
-DEFAULT_MODELS = ["gpt-4o-2024-11-20"]
+DEFAULT_MODELS = ["gpt-4o-mini"]
 
 # Load environment variables from .env file
 load_dotenv()
@@ -58,23 +58,6 @@ def generate_prompt(row, varieties):
     return prompt
 
 
-response_format = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "grape-variety",
-        "schema": {
-            "type": "object",
-            "properties": {"variety": {"type": "string", "enum": varieties.tolist()}},
-            "additionalProperties": False,
-            "required": ["variety"],
-        },
-        "strict": True,
-    },
-}
-
-# Initialize the progress index
-metadata_value = "wine-distillation-1000-italy" # that's a funny metadata tag :-)
-
 # Function to call the API and process the result for a single model (blocking call in this case)
 def call_model(model, prompt):
     while True:
@@ -82,17 +65,25 @@ def call_model(model, prompt):
             response = client.chat.completions.create(
                 model=model,
                 store=True,
-                metadata={
-                    "distillation": metadata_value,
-                },
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
-                    },
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": 
+                     """
+                        You're a sommelier expert and you know everything about wine. 
+                        You answer precisely with the name of the variety/blend without any additional text,
+                        using format: { "variety" : "answer" }   
+                        don't add anything else, just the answer in the given format.
+                        Don't add json in front of the response.
+                        Don't forget key variety in the json result.
+                        Theese are wrong format of answers:
+                        {"Champagne Blend" : "answer"}
+                        {"Grenache"} - missing variety key
+                        {"Rosé"} - missing variety key
+                        Good ones are:
+                        { "variety": "Chardonnay" }
+                        {"variety" : "Bordeaux-style White Blend"}
+                        Here the prompt to analize: 
+                    """ + prompt},
                 ],
-                response_format=response_format,
             )
             return json.loads(response.choices[0].message.content.strip())["variety"]
         except openai.RateLimitError as e:
@@ -124,7 +115,7 @@ def process_dataframe(df, model):
     # Create a tqdm progress bar
     with tqdm(total=len(df), desc="Processing rows") as progress_bar:
         # Process each example concurrently using ThreadPoolExecutor with limited workers
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
             futures = {
                 executor.submit(
                     process_example, index, row, model, df, progress_bar

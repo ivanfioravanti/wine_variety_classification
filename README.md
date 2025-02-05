@@ -90,7 +90,9 @@ In the providers folder you will find the individual implementations for each pr
 - `wine_lmstudio.py` - Implementation using LM Studio
 - `wine_deepseek.py` - Implementation using DeepSeek
 - `wine_anthropic.py` - Implementation using Anthropic
-- `wine_openai.py` - Implementation using OpenAI
+- `wine_openai.py` - Implementation using OpenAI (Structured)
+- `wine_openai_unstructured.py` - Implementation using OpenAI with unstructured processing.
+
 - `wine_mlx_omni_server.py` - Implementation using MLX Omni Server
 
 ## Usage
@@ -115,8 +117,12 @@ python -m providers.wine_mlx_omni_server
 # Run Ollama provider
 python -m providers.wine_ollama
 
-# Run OpenAI provider
+# Run OpenAI provider (Structured)
 python -m providers.wine_openai
+
+# Run OpenAI Unstructured provider
+python -m providers.wine_openai_unstructured
+
 
 # Run Anthropic provider
 python -m providers.wine_anthropic
@@ -126,6 +132,7 @@ python -m providers.wine_gemini
 python -m providers.wine_deepseek
 python -m providers.wine_lmstudio
 python -m providers.wine_openrouter
+
 ```
 
 To run all providers at once:
