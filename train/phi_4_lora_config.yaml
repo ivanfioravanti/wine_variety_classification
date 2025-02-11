@@ -60,13 +60,13 @@ lora_parameters:
   # The layer keys to apply LoRA to.
   # These will be applied for the last lora_layers
   keys: ["self_attn.o_proj","self_attn.qkv_proj"]
-  rank: 64
-  scale: 1 
+  rank: 128
+  scale: 10 
   dropout: 0
 
 # Schedule can only be specified in a config file, uncomment to use.
 lr_schedule:
   name: cosine_decay
   warmup: 60 
-  warmup_init: 1e-7
-  arguments: [1e-4, 2000, 1e-5] 
+  warmup_init: 1e-6
+  arguments: [5e-5, 3000, 5e-6] 
