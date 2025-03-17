@@ -1,5 +1,7 @@
+
+
 # The path to the local model directory or Hugging Face repo.
-model: "mlx-community/Mistral-Small-24B-Instruct-2501-bf16"
+model: "mlx-community/Llama-3.3-70B-Instruct-bf16"
 # Whether or not to train (boolean)
 train: true
 
@@ -12,22 +14,22 @@ seed: 0
 fine_tune_type: lora
 
 # Number of layers to fine-tune
-num_layers: 32
+num_layers: 16
 
 # Minibatch size.
-batch_size: 16
+batch_size: 1 6
 
 # Iterations to train for.
-iters: 4000
+iters: 8000
 
 # Number of validation batches, -1 uses the entire validation set.
 val_batches: 10
 
 # Adam learning rate.
-learning_rate: 1e-4
+learning_rate: 2e-5
 
 # Number of training steps between loss reporting.
-steps_per_report: 10
+steps_per_report: 1
 
 # Number of training steps between validations.
 steps_per_eval: 200
@@ -39,7 +41,7 @@ resume_adapter_file: null
 adapter_path: "adapters"
 
 # Save the model every N iterations.
-save_every: 200
+save_every: 300
 
 # Evaluate on the test set after training
 test: false
@@ -48,7 +50,7 @@ test: false
 test_batches: 100
 
 # Maximum sequence length.
-max_seq_length: 4096
+max_seq_length: 2048
 
 # Use gradient checkpointing to reduce memory use.
 grad_checkpoint: false
@@ -57,21 +59,14 @@ grad_checkpoint: false
 lora_parameters:
   # The layer keys to apply LoRA to.
   # These will be applied for the last lora_layers
-  keys: ["self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.down_proj","mlp.up_proj"]
-  rank: 64
-  scale: 20
-  dropout: 0.1
-
-optimizer: adamw
-
-lr_schedule:
-  name: linear_schedule
-  warmup: 5
-  arguments: [0, 1e-4, 3000] 
+  keys: ["self_attn.k_proj","self_attn.o_proj","self_attn.q_proj","self_attn.v_proj",mlp.down_proj","mlp.gate_proj","mlp.up_proj"]
+  rank: 32
+  scale: 20 
+  dropout: 0.05
 
 # Schedule can only be specified in a config file, uncomment to use.
-# lr_schedule:
-#  name: cosine_decay
-#  warmup: 100 # 0 for no warmup
-#  warmup_init: 2e-4 # 0 if not specified
-#  arguments: [2e-4, 1000, 1e-5] # passed to scheduler
+lr_schedule:
+  name: cosine_decay
+  warmup: 100 
+  warmup_init: 1e-7
+  arguments: [5e-5, 6000, 5e-6] 

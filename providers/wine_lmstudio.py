@@ -6,7 +6,7 @@ import pandas as pd
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Define default models for LMStudio provider
-DEFAULT_MODELS = ["Llama-3.2-3B-Instruct-4bit"]
+DEFAULT_MODELS = ["phi-4"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)

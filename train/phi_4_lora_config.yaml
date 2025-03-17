@@ -1,7 +1,7 @@
 
 
 # The path to the local model directory or Hugging Face repo.
-model: "microsoft/phi-4"
+model: "mlx-community/phi-4-bf16"
 # Whether or not to train (boolean)
 train: true
 
@@ -14,13 +14,13 @@ seed: 0
 fine_tune_type: lora
 
 # Number of layers to fine-tune
-num_layers: 16
+num_layers: 40
 
 # Minibatch size.
-batch_size: 8
+batch_size: 64
 
 # Iterations to train for.
-iters: 4000
+iters: 6000
 
 # Number of validation batches, -1 uses the entire validation set.
 val_batches: 20

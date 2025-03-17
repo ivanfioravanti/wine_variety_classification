@@ -14,7 +14,7 @@ parser.add_argument("--adapter-path", type=str, help="Path to fine-tuned adapter
 args = parser.parse_args()
 
 # Define default models for mlx_omni_server provider
-DEFAULT_MODELS = ["ivanfioravanti/Mistral-7B-Instruct-v0.3-italian-wine"]
+DEFAULT_MODELS = ["microsoft/phi-4"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -85,6 +85,7 @@ def call_model(model, prompt):
             },
             {"role": "user", "content": prompt},
         ],
+        "temperature": 0,
         "response_format": response_format,
     }
 

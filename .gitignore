@@ -31,7 +31,7 @@ ENV/
 
 # Project specific
 /results/providers*
-/adapters
+/adapters*
 /train/data
 /fused_model
 
