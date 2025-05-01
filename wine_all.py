@@ -15,6 +15,7 @@ from providers import wine_gemini_genai
 from providers import wine_openrouter
 from providers import wine_lmstudio
 from providers import wine_deepseek
+from providers import wine_mlx_server_unstructured
 
 
 def generate_chart(summary_df, timestamp):
@@ -110,6 +111,10 @@ def run_all_models():
         (wine_openrouter, ["deepseek/deepseek-chat"]),
         (wine_lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),
         (wine_deepseek, ["deepseek-chat"]),
+        (wine_mlx_server_unstructured, ["mlx-community/Qwen3-0.6B-8bit","mlx-community/Qwen3-0.6B-bf16","mlx-community/Qwen3-1.7B-4bit", "mlx-community/Qwen3-1.7B-8bit",
+                  "mlx-community/Qwen3-4B-4bit", "mlx-community/Qwen3-4B-8bit", "mlx-community/Qwen3-8B-4bit", "mlx-community/Qwen3-8B-8bit",
+                  "mlx-community/Qwen3-14B-4bit", "mlx-community/Qwen3-14B-8bit", "mlx-community/Qwen3-30B-A3B-4bit", "mlx-community/Qwen3-30B-A3B-8bit", 
+                  "mlx-community/Qwen3-32B-4bit", "mlx-community/Qwen3-32B-8bit", "mlx-community/Qwen3-235B-A22B-4bit", "mlx-community/Qwen3-235B-A22B-8bit"]),
     ]
 
     # Create results directory if it doesn't exist

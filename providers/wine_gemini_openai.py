@@ -11,7 +11,7 @@ import concurrent.futures
 import pandas as pd
 
 # Define default models
-DEFAULT_MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]
+DEFAULT_MODELS = ["gemini-2.5-pro-preview-03-25"]
 
 # Load environment variables from .env file
 load_dotenv()

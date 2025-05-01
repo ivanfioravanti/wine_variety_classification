@@ -12,7 +12,10 @@ parser = argparse.ArgumentParser(
 )
 
 # Define default models for mlx_omni_server provider
-DEFAULT_MODELS = ["Qwen/Qwen2.5-3B-Instruct"]
+DEFAULT_MODELS = ["mlx-community/Qwen3-0.6B-8bit","mlx-community/Qwen3-0.6B-bf16","mlx-community/Qwen3-1.7B-4bit", "mlx-community/Qwen3-1.7B-8bit","mlx-community/Qwen3-4B-4bit", 
+                  "mlx-community/Qwen3-4B-8bit", "mlx-community/Qwen3-8B-4bit", "mlx-community/Qwen3-8B-8bit","mlx-community/Qwen3-14B-4bit","mlx-community/Qwen3-14B-8bit", 
+                  "mlx-community/Qwen3-30B-A3B-4bit", "mlx-community/Qwen3-30B-A3B-8bit", "mlx-community/Qwen3-32B-4bit", 
+                  "mlx-community/Qwen3-235B-A22B-4bit", "mlx-community/Qwen3-235B-A22B-8bit"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -44,6 +47,7 @@ def generate_prompt(row, varieties):
     variety_list = ", ".join(varieties)
 
     prompt = f"""
+    /no_think
     Based on this wine review, guess the grape variety:
     This wine is produced by {row['winery']} in the {row['province']} region of {row['country']}.
     It was grown in {row['region_1']}. It is described as: "{row['description']}".
@@ -85,7 +89,17 @@ def call_model(model, prompt):
     }
 
     response = client.chat.completions.create(**kwargs)
-    return json.loads(response.choices[0].message.content.strip())["variety"]
+    content = response.choices[0].message.content.strip()
+    
+    # Find the JSON part of the response
+    start_idx = content.find('{')
+    end_idx = content.rfind('}') + 1
+    
+    if start_idx == -1 or end_idx == 0:
+        raise ValueError("No JSON object found in response")
+        
+    json_str = content[start_idx:end_idx]
+    return json.loads(json_str)["variety"]
 
 
 def process_example(index, row, model, df, progress_bar):
@@ -172,7 +186,7 @@ DEFAULT_MODELS = ["ivanfioravanti/Qwen2.5-3B-Instruct-italian-wine-fp16"]
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
 
-client = OpenAI(base_url="http://localhost:8081/v1", api_key="not-needed")
+client = OpenAI(base_url="http://localhost:8080/v1", api_key="not-needed")
 
 df = pd.read_csv("data/winemag-data-130k-v2.csv")
 df_country = df[df["country"] == COUNTRY]
@@ -199,6 +213,7 @@ def generate_prompt(row, varieties):
     variety_list = ", ".join(varieties)
 
     prompt = f"""
+    /no_think
     Based on this wine review, guess the grape variety:
     This wine is produced by {row['winery']} in the {row['province']} region of {row['country']}.
     It was grown in {row['region_1']}. It is described as: "{row['description']}".
@@ -240,7 +255,17 @@ def call_model(model, prompt):
     }
 
     response = client.chat.completions.create(**kwargs)
-    return json.loads(response.choices[0].message.content.strip())["variety"]
+    content = response.choices[0].message.content.strip()
+    
+    # Find the JSON part of the response
+    start_idx = content.find('{')
+    end_idx = content.rfind('}') + 1
+    
+    if start_idx == -1 or end_idx == 0:
+        raise ValueError("No JSON object found in response")
+        
+    json_str = content[start_idx:end_idx]
+    return json.loads(json_str)["variety"]
 
 
 def process_example(index, row, model, df, progress_bar):

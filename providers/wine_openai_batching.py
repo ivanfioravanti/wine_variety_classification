@@ -36,6 +36,7 @@ df_country_subset = df_country.sample(n=SAMPLE_SIZE, random_state=RANDOM_SEED)
 
 varieties = np.array(df_country["variety"].unique()).astype("str")
 
+
 def generate_prompt(row, varieties):
     # Format the varieties list as a comma-separated string
     variety_list = ", ".join(varieties)
@@ -53,6 +54,7 @@ def generate_prompt(row, varieties):
     """
     return prompt
 
+
 response_format = {
     "type": "json_schema",
     "json_schema": {
@@ -67,13 +69,14 @@ response_format = {
     },
 }
 
+
 def create_batch_tasks(df, model):
     """Create batch tasks for wine classification."""
     tasks = []
-    
+
     for index, row in df.iterrows():
         prompt = generate_prompt(row, varieties)
-        
+
         task = {
             "custom_id": f"task-{index}",
             "method": "POST",
@@ -83,41 +86,40 @@ def create_batch_tasks(df, model):
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend."
+                        "content": "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
                     },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt},
                 ],
                 "response_format": response_format,
-                "metadata": {
-                    "distillation": "true"
-                }
-            }
+                "metadata": {"distillation": "true"},
+            },
         }
         tasks.append(task)
-    
+
     return tasks
+
 
 def process_batch_results(df, results, model):
     """Process batch results and update dataframe."""
     for result in results:
-        task_id = result['custom_id']
-        index = int(task_id.split('-')[1])
-        variety = json.loads(result['response']['body']['choices'][0]['message']['content'])['variety']
+        task_id = result["custom_id"]
+        index = int(task_id.split("-")[1])
+        variety = json.loads(
+            result["response"]["body"]["choices"][0]["message"]["content"]
+        )["variety"]
         df.at[index, f"{model}-variety"] = variety
-    
+
     return df
+
 
 def process_dataframe(df, model, batch_job_id=None):
     """Process dataframe using batch API.
-    
+
     Args:
         df: DataFrame to process
         model: Model name to use
         batch_job_id: Optional batch job ID to resume processing
-    
+
     Returns:
         Tuple of (processed DataFrame, batch_job_id)
     """
@@ -127,33 +129,32 @@ def process_dataframe(df, model, batch_job_id=None):
     else:
         print(f"Creating batch tasks for {model}...")
         tasks = create_batch_tasks(df, model)
-        
+
         # Generate timestamp for file names
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         # Save tasks to JSONL file
         batch_file_path = f"data/batch_tasks_{model}_{timestamp}.jsonl"
-        with open(batch_file_path, 'w') as file:
+        with open(batch_file_path, "w") as file:
             for task in tasks:
-                file.write(json.dumps(task) + '\n')
-        
+                file.write(json.dumps(task) + "\n")
+
         # Upload file and create batch job
         print("Uploading batch file...")
         batch_file = client.files.create(
-            file=open(batch_file_path, "rb"),
-            purpose="batch"
+            file=open(batch_file_path, "rb"), purpose="batch"
         )
-        
+
         print("Creating batch job...")
         batch_job = client.batches.create(
             input_file_id=batch_file.id,
             endpoint="/v1/chat/completions",
-            completion_window="24h"
+            completion_window="24h",
         )
-    
+
     # Print current job ID for reference
     print(f"Batch Job ID: {batch_job.id}")
-    
+
     # Wait for job completion
     while True:
         job_status = client.batches.retrieve(batch_job.id)
@@ -161,29 +162,31 @@ def process_dataframe(df, model, batch_job_id=None):
             break
         print(f"Waiting for batch job completion... Status: {job_status.status}")
         time.sleep(30)  # Check every 30 seconds
-    
+
     # Get results
     print("Processing results...")
     result_file_id = job_status.output_file_id
     result_content = client.files.content(result_file_id).content
-    
+
     # Save results using timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result_file_path = f"data/batch_results_{model}_{timestamp}.jsonl"
-    with open(result_file_path, 'wb') as file:
+    with open(result_file_path, "wb") as file:
         file.write(result_content)
-    
+
     # Process results
     results = []
-    with open(result_file_path, 'r') as file:
+    with open(result_file_path, "r") as file:
         for line in file:
             results.append(json.loads(line.strip()))
-    
+
     processed_df = process_batch_results(df, results, model)
     return processed_df, batch_job.id
 
+
 def get_accuracy(model, df):
     return np.mean(df["variety"] == df[model + "-variety"])
+
 
 def run_provider(models=None, batch_job_ids=None):
     """
@@ -203,9 +206,7 @@ def run_provider(models=None, batch_job_ids=None):
     for model in models_to_use:
         print(f"Processing with {model}...")
         working_df, job_id = process_dataframe(
-            df_country_subset.copy(), 
-            model,
-            batch_job_ids.get(model)
+            df_country_subset.copy(), model, batch_job_ids.get(model)
         )
         accuracy = get_accuracy(model, working_df)
         results[model] = {
@@ -218,6 +219,7 @@ def run_provider(models=None, batch_job_ids=None):
         final_df = working_df if final_df is None else final_df
 
     return final_df, results, job_ids
+
 
 if __name__ == "__main__":
     # Example of resuming a job:

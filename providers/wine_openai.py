@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Define default models
-DEFAULT_MODELS = ["gpt-4o-2024-11-20"]
+DEFAULT_MODELS = ["gpt-4.1-mini", "gpt-4.1-nano"]
 
 # Load environment variables from .env file
 load_dotenv()
@@ -73,7 +73,8 @@ response_format = {
 }
 
 # Initialize the progress index
-metadata_value = "wine-distillation-1000-italy" # that's a funny metadata tag :-)
+metadata_value = "wine-distillation-1000-italy"  # that's a funny metadata tag :-)
+
 
 # Function to call the API and process the result for a single model (blocking call in this case)
 def call_model(model, prompt):

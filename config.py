@@ -1,3 +1,3 @@
-COUNTRY = "Italy"
-SAMPLE_SIZE = 100
-RANDOM_SEED = 42  # Fixed seed for reproducible sampling 
+COUNTRY = "France"
+SAMPLE_SIZE = 200
+RANDOM_SEED = 123  # Fixed seed for reproducible sampling

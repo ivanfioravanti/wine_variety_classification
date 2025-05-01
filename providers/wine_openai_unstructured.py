@@ -66,8 +66,9 @@ def call_model(model, prompt):
                 model=model,
                 store=True,
                 messages=[
-                    {"role": "user", "content": 
-                     """
+                    {
+                        "role": "user",
+                        "content": """
                         You're a sommelier expert and you know everything about wine. 
                         You answer precisely with the name of the variety/blend without any additional text,
                         using format: { "variety" : "answer" }   
@@ -82,7 +83,9 @@ def call_model(model, prompt):
                         { "variety": "Chardonnay" }
                         {"variety" : "Bordeaux-style White Blend"}
                         Here the prompt to analize: 
-                    """ + prompt},
+                    """
+                        + prompt,
+                    },
                 ],
             )
             return json.loads(response.choices[0].message.content.strip())["variety"]
