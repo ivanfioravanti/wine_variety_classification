@@ -1,0 +1,14 @@
+model,accuracy,sample_size,country
+qwen3:14b,0.75,200,France
+mlx-community/Qwen3-14B-4bit,0.7,200,France
+mlx-community/Qwen3-32B-4bit,0.7,200,France
+qwen3:32b,0.69,200,France
+qwen3:8b,0.56,200,France
+qwen3:4b,0.55,200,France
+mlx-community/Qwen3-4B-4bit,0.515,200,France
+mlx-community/Qwen3-8B-4bit,0.5,200,France
+mlx-community/Qwen3-1.7B-4bit,0.235,200,France
+qwen3:1.7b,0.2,200,France
+qwen3:0.6b,0.145,200,France
+mlx-community/Qwen3-0.6B-4bit,0.1,200,France
+gemini-2.5-pro-preview-03-25,0.85,200,France

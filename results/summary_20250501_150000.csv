@@ -1,0 +1,17 @@
+model,accuracy,sample_size,country
+mlx-community/Qwen3-14B-8bit,0.72,200,France
+mlx-community/Qwen3-32B-8bit,0.71,200,France
+mlx-community/Qwen3-14B-4bit,0.7,200,France
+mlx-community/Qwen3-32B-4bit,0.7,200,France
+mlx-community/Qwen3-235B-A22B-8bit,0.685,200,France
+mlx-community/Qwen3-30B-A3B-8bit,0.68,200,France
+mlx-community/Qwen3-30B-A3B-4bit,0.67,200,France
+mlx-community/Qwen3-235B-A22B-4bit,0.645,200,France
+mlx-community/Qwen3-8B-8bit,0.585,200,France
+mlx-community/Qwen3-4B-8bit,0.54,200,France
+mlx-community/Qwen3-4B-4bit,0.515,200,France
+mlx-community/Qwen3-8B-4bit,0.5,200,France
+mlx-community/Qwen3-1.7B-8bit,0.27,200,France
+mlx-community/Qwen3-1.7B-4bit,0.235,200,France
+mlx-community/Qwen3-0.6B-8bit,0.16,200,France
+mlx-community/Qwen3-0.6B-bf16,0.16,200,France

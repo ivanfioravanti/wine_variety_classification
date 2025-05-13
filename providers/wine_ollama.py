@@ -32,6 +32,7 @@ def generate_prompt(row, varieties):
     variety_list = ", ".join(varieties)
 
     prompt = f"""
+    /
     Based on this wine review, guess the grape variety:
     This wine is produced by {row['winery']} in the {row['province']} region of {row['country']}.
     It was grown in {row['region_1']}. It is described as: "{row['description']}".
@@ -104,7 +105,11 @@ def get_accuracy(model, df):
 
 
 # Default models to use when running the provider directly
-DEFAULT_MODELS = ["llama3.2:latest", "llama3.3:latest"]
+DEFAULT_MODELS = [
+    "qwen3:8b-fp16",
+]
+
+# DEFAULT_MODELS = ["llama3.2:latest", "llama3.3:latest"]
 
 
 def run_provider(models=None):

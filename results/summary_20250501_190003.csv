@@ -1,0 +1,13 @@
+model,accuracy,sample_size,country
+mlx-community/Qwen3-14B-8bit,0.72,200,France
+qwen3:14b-q8_0,0.71,200,France
+mlx-community/Qwen3-32B-8bit,0.71,200,France
+qwen3:32b-q8_0,0.695,200,France
+qwen3:4b-q8_0,0.605,200,France
+mlx-community/Qwen3-8B-8bit,0.585,200,France
+qwen3:8b-q8_0,0.54,200,France
+mlx-community/Qwen3-4B-8bit,0.54,200,France
+mlx-community/Qwen3-1.7B-8bit,0.27,200,France
+qwen3:1.7b-q8_0,0.21,200,France
+mlx-community/Qwen3-0.6B-8bit,0.16,200,France
+qwen3:0.6b-q8_0,0.155,200,France

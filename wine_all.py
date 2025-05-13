@@ -86,35 +86,41 @@ def run_all_models():
 
     # List of all modules and their models
     module_models = [
-        (
-            wine_anthropic,
-            [
-                "claude-3-5-haiku-20241022",
-                "claude-3-5-sonnet-20241022",
-                "claude-3-opus-20240229",
-            ],
-        ),
-        (
-            wine_ollama,
-            [
-                "llama3.1:latest",
-                "llama3.2:latest",
-                "llama3.3:latest",
-                "qwen2.5:72b-instruct",
-            ],
-        ),
-        (wine_openai, ["gpt-4o", "gpt-4o-mini"]),
-        (
-            wine_gemini_genai,
-            ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"],
-        ),
-        (wine_openrouter, ["deepseek/deepseek-chat"]),
-        (wine_lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),
-        (wine_deepseek, ["deepseek-chat"]),
-        (wine_mlx_server_unstructured, ["mlx-community/Qwen3-0.6B-8bit","mlx-community/Qwen3-0.6B-bf16","mlx-community/Qwen3-1.7B-4bit", "mlx-community/Qwen3-1.7B-8bit",
-                  "mlx-community/Qwen3-4B-4bit", "mlx-community/Qwen3-4B-8bit", "mlx-community/Qwen3-8B-4bit", "mlx-community/Qwen3-8B-8bit",
-                  "mlx-community/Qwen3-14B-4bit", "mlx-community/Qwen3-14B-8bit", "mlx-community/Qwen3-30B-A3B-4bit", "mlx-community/Qwen3-30B-A3B-8bit", 
-                  "mlx-community/Qwen3-32B-4bit", "mlx-community/Qwen3-32B-8bit", "mlx-community/Qwen3-235B-A22B-4bit", "mlx-community/Qwen3-235B-A22B-8bit"]),
+        # (
+        #     wine_anthropic,
+        #     [
+        #         "claude-3-5-haiku-20241022",
+        #         "claude-3-5-sonnet-20241022",
+        #         "claude-3-opus-20240229",
+        #     ],
+        # ),
+        # (
+        #     wine_ollama,
+        #     [
+        #         # "qwen3:235b",
+        #         # "qwen3:30b",
+        #         "qwen3:32b-q8_0",
+        #         "qwen3:14b-q8_0",
+        #         "qwen3:8b-q8_0",
+        #         "qwen3:4b-q8_0",
+        #         "qwen3:0.6b-q8_0",
+        #         "qwen3:1.7b-q8_0"
+        #     ],
+        # ),
+        # (wine_openai, ["gpt-4o", "gpt-4o-mini"]),
+        # (
+        #     wine_gemini_genai,
+        #     ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"],
+        # ),
+        # (wine_openrouter, ["deepseek/deepseek-chat"]),
+        # (wine_lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),
+        # (wine_deepseek, ["deepseek-chat"]),
+        # (wine_mlx_server_unstructured, ["mlx-community/Qwen3-0.6B-8bit","mlx-community/Qwen3-0.6B-bf16","mlx-community/Qwen3-1.7B-4bit", "mlx-community/Qwen3-1.7B-8bit",
+        #           "mlx-community/Qwen3-4B-4bit", "mlx-community/Qwen3-4B-8bit", "mlx-community/Qwen3-8B-4bit", "mlx-community/Qwen3-8B-8bit",
+        #           "mlx-community/Qwen3-14B-4bit", "mlx-community/Qwen3-14B-8bit", "mlx-community/Qwen3-30B-A3B-4bit", "mlx-community/Qwen3-30B-A3B-8bit", 
+        #           "mlx-community/Qwen3-32B-4bit", "mlx-community/Qwen3-32B-8bit", "mlx-community/Qwen3-235B-A22B-4bit", "mlx-community/Qwen3-235B-A22B-8bit"]),        
+        (wine_mlx_server_unstructured, ["mlx-community/Qwen3-8B-4bit-DWQ"]),
+        # (wine_mlx_server_unstructured, ["mlx-community/gemma-3-27b-it-qat-4bit"]),
     ]
 
     # Create results directory if it doesn't exist

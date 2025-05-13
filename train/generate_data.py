@@ -49,16 +49,13 @@ def create_wine_sample(row):
     points = row.get("points", "")
     price = row.get("price", "")
 
-    prompt = f"""Based on this wine review, guess the grape variety:
+    prompt = f"""/no_think\nBased on this wine review, guess the grape variety:
 This wine is produced by {winery} in the {province} region of {country}.
 It was grown in {region_1}. It is described as: "{description}".
 The wine has been reviewed by {taster_name} and received {points} points.
 The price is {price}"""
 
-    completion_template = {
-        "variety": row["variety"],
-    }
-    return {"prompt": prompt, "completion": json.dumps(completion_template)}
+    return {"prompt": prompt, "completion": f"<think>\n\n</think>{{\"variety\": \"{row['variety']}\"}}"}
 
 
 print("Processing wine data...")
