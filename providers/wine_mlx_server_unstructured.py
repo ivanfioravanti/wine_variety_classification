@@ -25,7 +25,6 @@ client = OpenAI(base_url="http://localhost:8080/v1", api_key="not-needed")
 # Load and prepare the dataset
 df_country_subset, varieties = prepare_wine_data()
 
-
 def generate_prompt(row, varieties):
     # Format the varieties list as a comma-separated string
     variety_list = ", ".join(varieties)
