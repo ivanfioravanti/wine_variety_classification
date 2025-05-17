@@ -70,7 +70,7 @@ response_format = {
 }
 
 
-# Function to call the API and process the result for a single model (blocking call in this case)
+# Function to call the API and return the grape variety predicted by a single model
 def call_model(model, prompt, max_retries=3, timeout=10):
     for attempt in range(max_retries):
         try:
@@ -95,7 +95,10 @@ def call_model(model, prompt, max_retries=3, timeout=10):
                 timeout=timeout,
             )
             response_json = response.json()
-            return response_json["choices"][0]["message"]["content"]
+            variety = json.loads(
+                response_json["choices"][0]["message"]["content"]
+            )["variety"]
+            return variety
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             if attempt == max_retries - 1:
                 print(

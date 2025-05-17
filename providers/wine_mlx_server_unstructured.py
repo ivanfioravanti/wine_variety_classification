@@ -76,7 +76,7 @@ def call_model(model, prompt):
                         don't add anything else, just the answer in the given format.
                         Don't add json in front of the response.
                         Don't forget key variety in the json result.
-                        Theese are wrong format of answers:
+                        These are wrong format of answers:
                         {"Champagne Blend" : "answer"}
                         {"Grenache"} - missing variety key
                         {"Rosé"} - missing variety key
@@ -242,7 +242,7 @@ def call_model(model, prompt):
                         don't add anything else, just the answer in the given format.
                         Don't add json in front of the response.
                         Don't forget key variety in the json result.
-                        Theese are wrong format of answers:
+                        These are wrong format of answers:
                         {"Champagne Blend" : "answer"}
                         {"Grenache"} - missing variety key
                         {"Rosé"} - missing variety key
