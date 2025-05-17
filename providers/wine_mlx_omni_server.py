@@ -2,7 +2,7 @@ from openai import OpenAI
 import json
 from tqdm import tqdm
 import numpy as np
-import pandas as pd
+from data_utils import prepare_wine_data
 import argparse
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
@@ -21,24 +21,8 @@ np.random.seed(RANDOM_SEED)
 
 client = OpenAI(base_url="http://localhost:10240/v1", api_key="not-needed")
 
-df = pd.read_csv("data/winemag-data-130k-v2.csv")
-df_country = df[df["country"] == COUNTRY]
-
-# Let's also filter out wines that have less than 5 references with their grape variety – even though we'd like to find those
-# they're outliers that we don't want to optimize for that would make our enum list be too long
-# and they could also add noise for the rest of the dataset on which we'd like to guess, eventually reducing our accuracy.
-
-varieties_less_than_five_list = (
-    df_country["variety"]
-    .value_counts()[df_country["variety"].value_counts() < 5]
-    .index.tolist()
-)
-df_country = df_country[~df_country["variety"].isin(varieties_less_than_five_list)]
-
-# Modified sampling to include random_state
-df_country_subset = df_country.sample(n=SAMPLE_SIZE, random_state=RANDOM_SEED)
-
-varieties = np.array(df_country["variety"].unique()).astype("str")
+# Load and prepare the dataset
+df_country_subset, varieties = prepare_wine_data()
 
 
 def generate_prompt(row, varieties):

@@ -5,7 +5,7 @@ import os
 from tqdm import tqdm
 from openai import OpenAI
 import numpy as np
-import pandas as pd
+from data_utils import prepare_wine_data
 from datetime import datetime
 from dotenv import load_dotenv
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
@@ -21,20 +21,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
 
-df = pd.read_csv("data/winemag-data-130k-v2.csv")
-df_country = df[df["country"] == COUNTRY]
-
-# Filter out wines with less than 5 references
-varieties_less_than_five_list = (
-    df_country["variety"]
-    .value_counts()[df_country["variety"].value_counts() < 5]
-    .index.tolist()
-)
-df_country = df_country[~df_country["variety"].isin(varieties_less_than_five_list)]
-
-df_country_subset = df_country.sample(n=SAMPLE_SIZE, random_state=RANDOM_SEED)
-
-varieties = np.array(df_country["variety"].unique()).astype("str")
+# Load and prepare the dataset
+df_country_subset, varieties = prepare_wine_data()
 
 
 def generate_prompt(row, varieties):
