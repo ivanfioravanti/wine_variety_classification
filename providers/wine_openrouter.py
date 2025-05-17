@@ -95,7 +95,8 @@ def call_model(model, prompt, max_retries=3, timeout=10):
                 timeout=timeout,
             )
             response_json = response.json()
-            return response_json["choices"][0]["message"]["content"]
+            content = response_json["choices"][0]["message"]["content"].strip()
+            return json.loads(content)["variety"]
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             if attempt == max_retries - 1:
                 print(
