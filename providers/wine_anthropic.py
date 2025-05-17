@@ -19,8 +19,8 @@ DEFAULT_MODELS = [
 # Load environment variables from .env file
 load_dotenv()
 
-client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-client = Anthropic(timeout=20.0)
+# Initialize the Anthropic client once with API key and timeout
+client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=20.0)
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
