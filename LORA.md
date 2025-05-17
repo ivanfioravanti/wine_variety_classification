@@ -22,6 +22,11 @@ python -m train.generate_data
 python -m train.generate_data --all-countries
 ```
 
+3. Generate data with Qwen3 formatting (adds `/no_think` and `<think>` tags):
+```bash
+python -m train.generate_data --qwen3-format
+```
+
 The script will:
 - Load and filter the wine dataset
 - Remove rare varieties (less than 5 examples)
@@ -74,4 +79,14 @@ Key configuration options in `phi_lora_config_sample.yaml`:
   - Initial warmup steps: 100
   - Learning rate range: 1e-6 to 1e-4
 
-Monitor the training progress through the logged metrics and validation results. 
+Monitor the training progress through the logged metrics and validation results.
+
+### Qwen3 Training
+
+For fine-tuning Qwen3 models, use `train/qwen_lora_config.yaml` and make sure
+your training data was generated with the `--qwen3-format` flag. Start training
+with:
+
+```bash
+mlx_lm.lora --config ./train/qwen_lora_config.yaml
+```

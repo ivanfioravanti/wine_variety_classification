@@ -105,6 +105,10 @@ In the providers folder you will find the individual implementations for each pr
 3. Set up your environment variables in `.env` file
 4. Download the dataset and place it in the `data` folder
 5. Run the Jupyter notebook or individual Python scripts
+6. To generate data for Qwen3 fine-tuning use:
+   ```bash
+   python -m train.generate_data --qwen3-format
+   ```
 
 ### Running Individual Providers
 
