@@ -5,7 +5,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 import concurrent.futures
-import pandas as pd
+from data_utils import prepare_wine_data
 from dotenv import load_dotenv
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
@@ -25,23 +25,8 @@ client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=20.0)
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
 
-df = pd.read_csv("data/winemag-data-130k-v2.csv")
-df_country = df[df["country"] == COUNTRY]
-
-# Let's also filter out wines that have less than 5 references with their grape variety – even though we'd like to find those
-# they're outliers that we don't want to optimize for that would make our enum list be too long
-# and they could also add noise for the rest of the dataset on which we'd like to guess, eventually reducing our accuracy.
-
-varieties_less_than_five_list = (
-    df_country["variety"]
-    .value_counts()[df_country["variety"].value_counts() < 5]
-    .index.tolist()
-)
-df_country = df_country[~df_country["variety"].isin(varieties_less_than_five_list)]
-
-df_country_subset = df_country.sample(n=SAMPLE_SIZE, random_state=RANDOM_SEED)
-
-varieties = np.array(df_country["variety"].unique()).astype("str")
+# Load and prepare the dataset
+df_country_subset, varieties = prepare_wine_data()
 
 
 def generate_prompt(row, varieties):
