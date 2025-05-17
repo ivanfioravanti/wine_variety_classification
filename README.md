@@ -80,7 +80,7 @@ The project uses the [Wine Reviews dataset](https://www.kaggle.com/datasets/zyni
 
 ## Project Structure
 
-- `wine.ipynb` - Main Jupyter notebook with code and explanations
+- `wine_ollama.ipynb` - Main Jupyter notebook with code and explanations
 - `wine_all.py` - Implementation using all providers
 
 In the providers folder you will find the individual implementations for each provider.
