@@ -2,8 +2,6 @@
 
 # The path to the local model directory or Hugging Face repo.
 model: "mlx-community/Qwen3-1.7B-bf16"
-# Use /no_think prompts with <think> tags
-qwen3_format: true
 # Whether or not to train (boolean)
 # train: true
 
