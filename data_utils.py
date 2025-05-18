@@ -1,11 +1,28 @@
 import pandas as pd
 import numpy as np
+import json
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 
-def load_wine_data(csv_path: str = "data/winemag-data-130k-v2.csv") -> pd.DataFrame:
-    """Load the wine reviews CSV."""
-    return pd.read_csv(csv_path)
+def load_wine_data(file_path: str = "train/data/test.jsonl") -> pd.DataFrame:
+    """Load the wine reviews JSONL file and extract country and variety."""
+    raw_df = pd.read_json(file_path, lines=True)
+    
+    # Extract variety from the 'completion' column (JSON string)
+    def extract_variety(completion_str):
+        try:
+            return json.loads(completion_str)['variety']
+        except (json.JSONDecodeError, KeyError, TypeError):
+            return np.nan
+            
+    raw_df['variety'] = raw_df['completion'].apply(extract_variety)
+    
+    # Extract country from the 'prompt' column using regex
+    # Assumes country is mentioned after "region of " and followed by a period.
+    country_extract_series = raw_df['prompt'].str.extract(r"region of ([^.]+)\.", expand=False)
+    raw_df['country'] = country_extract_series
+    
+    return raw_df
 
 
 def filter_by_country(df: pd.DataFrame, country: str = COUNTRY) -> pd.DataFrame:
@@ -30,7 +47,7 @@ def sample_rows(
 
 
 def prepare_wine_data(
-    csv_path: str = "data/winemag-data-130k-v2.csv",
+    file_path: str = "train/data/test.jsonl",
     country: str = COUNTRY,
     sample_size: int = SAMPLE_SIZE,
     random_state: int = RANDOM_SEED,
@@ -40,7 +57,7 @@ def prepare_wine_data(
 
     Returns the sampled DataFrame and an array of unique varieties after filtering.
     """
-    df = load_wine_data(csv_path)
+    df = load_wine_data(file_path)
     df = filter_by_country(df, country)
     df = remove_rare_varieties(df, min_count)
     df_subset = sample_rows(df, sample_size, random_state)
