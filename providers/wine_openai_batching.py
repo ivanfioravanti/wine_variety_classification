@@ -97,6 +97,12 @@ def process_batch_results(df, results, model):
         )["variety"]
         df.at[index, f"{model}-variety"] = variety
 
+        actual_variety = df.at[index, "variety"]
+        if variety == actual_variety:
+            tqdm.write(f"✅ Predicted: {variety}, Actual: {actual_variety}")
+        else:
+            tqdm.write(f"❌ Predicted: {variety}, Actual: {actual_variety}")
+
     return df
 
 
