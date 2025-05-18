@@ -99,6 +99,13 @@ def process_example(index, row, model, df, progress_bar):
         prompt = generate_prompt(row, varieties)
         result = call_model(model, prompt)
         df.at[index, model + "-variety"] = result
+
+        actual_variety = row["variety"]
+        if result == actual_variety:
+            tqdm.write(f"✅ Predicted: {result}, Actual: {actual_variety}")
+        else:
+            tqdm.write(f"❌ Predicted: {result}, Actual: {actual_variety}")
+
         progress_bar.update(1)
     except Exception as e:
         print(f"Error processing example {index}: {str(e)}")

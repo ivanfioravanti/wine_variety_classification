@@ -79,7 +79,14 @@ def process_example(index, row, model, df, progress_bar):
         # Generate the prompt using the row
         prompt = generate_prompt(row, varieties)
 
-        df.at[index, model + "-variety"] = call_model(model, prompt)
+        predicted_variety = call_model(model, prompt)
+        df.at[index, model + "-variety"] = predicted_variety
+
+        actual_variety = row["variety"]
+        if predicted_variety == actual_variety:
+            tqdm.write(f"✅ Predicted: {predicted_variety}, Actual: {actual_variety}")
+        else:
+            tqdm.write(f"❌ Predicted: {predicted_variety}, Actual: {actual_variety}")
 
         # Update the progress bar
         progress_bar.update(1)
