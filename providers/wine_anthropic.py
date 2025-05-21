@@ -9,6 +9,33 @@ from data_utils import prepare_wine_data
 from dotenv import load_dotenv
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
+# Global variable to store data from JSONL file
+jsonl_data = []
+
+# Function to load data from JSONL file
+def load_jsonl_data(file_path="./train/data/test.jsonl"):
+    data = []
+    try:
+        with open(file_path, 'r') as f:
+            for line in f:
+                try:
+                    data.append(json.loads(line))
+                except json.JSONDecodeError as e:
+                    print(
+                        f"Warning: Skipping malformed JSON line in {file_path}: {line.strip()} - Error: {e}"
+                    )
+        if not data:
+            print(
+                f"Warning: No data loaded from {file_path}. File might be empty or all lines were malformed."
+            )
+        return data
+    except FileNotFoundError:
+        print(f"Error: {file_path} not found. Please ensure the file exists in the correct location.")
+        return []  # Return empty list if file not found
+    except Exception as e:
+        print(f"An unexpected error occurred while loading {file_path}: {e}")
+        return []
+
 # Define default models
 DEFAULT_MODELS = [
     "claude-3-5-haiku-20241022",
@@ -28,23 +55,22 @@ np.random.seed(RANDOM_SEED)
 # Load and prepare the dataset
 df_country_subset, varieties = prepare_wine_data()
 
+# Load data from JSONL file at the beginning
+jsonl_data = load_jsonl_data()
 
-def generate_prompt(row, varieties):
-    # Format the varieties list as a comma-separated string
-    variety_list = ", ".join(varieties)
 
-    prompt = f"""
-    Based on this wine review, guess the grape variety:
-    This wine is produced by {row['winery']} in the {row['province']} region of {row['country']}.
-    It was grown in {row['region_1']}. It is described as: "{row['description']}".
-    The wine has been reviewed by {row['taster_name']} and received {row['points']} points.
-    The price is {row['price']}.
+def generate_prompt(index):
+    """Generates a prompt using the entry at the given index from the loaded JSONL data."""
+    if not jsonl_data:
+        raise ValueError("JSONL data is not loaded or is empty.")
+    if index >= len(jsonl_data):
+        raise IndexError(f"Index {index} is out of bounds for JSONL data with length {len(jsonl_data)}.")
 
-    Here is a list of possible grape varieties to choose from: {variety_list}.
-    
-    What is the likely grape variety? Answer only with the grape variety name or blend from the list.
-    """
-    return prompt
+    entry = jsonl_data[index]
+    if "prompt" not in entry:
+        raise KeyError(f"Key 'prompt' not found in JSONL data at index {index}.")
+
+    return entry["prompt"]
 
 
 # Function to call the API and process the result for a single model (blocking call in this case)
