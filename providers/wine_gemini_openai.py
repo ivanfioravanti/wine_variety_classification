@@ -113,7 +113,7 @@ def process_example(df_index, row, jsonl_idx, model, df, progress_bar):
         prompt = generate_prompt(jsonl_idx)
 
         predicted_variety = call_model(model, prompt)
-        df.at[index, model + "-variety"] = predicted_variety
+        df.at[df_index, model + "-variety"] = predicted_variety
 
         actual_variety = row["variety"]
         if predicted_variety == actual_variety:

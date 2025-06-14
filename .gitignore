@@ -56,3 +56,4 @@ cover/
 data/*.csv
 data/*.json
 .aider*
+nohup.out
