@@ -1,5 +1,5 @@
 # The path to the local model directory or Hugging Face repo.
-model: "mlx-community/Mistral-Small-24B-Instruct-2501-bf16"
+model: "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
 # Whether or not to train (boolean)
 train: true
 
@@ -7,7 +7,7 @@ train: true
 data: "./train/data"
 
 # The PRNG seed
-seed: 0
+seed: 234
 
 fine_tune_type: lora
 
@@ -15,7 +15,7 @@ fine_tune_type: lora
 num_layers: 32
 
 # Minibatch size.
-batch_size: 16
+batch_size: 8
 
 # Iterations to train for.
 iters: 4000
@@ -24,7 +24,7 @@ iters: 4000
 val_batches: 10
 
 # Adam learning rate.
-learning_rate: 1e-4
+learning_rate: 1e-5
 
 # Number of training steps between loss reporting.
 steps_per_report: 10
@@ -48,10 +48,17 @@ test: false
 test_batches: 100
 
 # Maximum sequence length.
-max_seq_length: 4096
+max_seq_length: 256
 
 # Use gradient checkpointing to reduce memory use.
 grad_checkpoint: false
+
+optimizer_config:
+  adamw:
+    betas: [0.9, 0.98]
+    eps: 1e-6
+    weight_decay: 0.05
+    bias_correction: true
 
 # LoRA parameters can only be specified in a config file
 lora_parameters:
@@ -60,18 +67,18 @@ lora_parameters:
   keys: ["self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.down_proj","mlp.up_proj"]
   rank: 64
   scale: 20
-  dropout: 0.1
+  dropout: 0
 
-optimizer: adamw
-
-lr_schedule:
-  name: linear_schedule
-  warmup: 5
-  arguments: [0, 1e-4, 3000] 
+# lr_schedule:
+#   name: linear_schedule
+#   warmup: 5
+#   arguments: [0, 1e-4, 3000] 
 
 # Schedule can only be specified in a config file, uncomment to use.
-# lr_schedule:
-#  name: cosine_decay
-#  warmup: 100 # 0 for no warmup
-#  warmup_init: 2e-4 # 0 if not specified
-#  arguments: [2e-4, 1000, 1e-5] # passed to scheduler
+lr_schedule:
+  name: cosine_decay
+  warmup: 50 # 0 for no warmup
+  warmup_init: 5e-5 # 0 if not specified
+  arguments: [1e-4, 500, 5e-5] # passed to scheduler
+
+wandb: "mlx-finetuning-mistral"

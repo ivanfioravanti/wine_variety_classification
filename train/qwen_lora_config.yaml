@@ -1,7 +1,5 @@
-
-
 # The path to the local model directory or Hugging Face repo.
-model: "mlx-community/Qwen3-0.6B-bf16"
+model: "mlx-community/Qwen3-0.6B-4bit"
 # Whether or not to train (boolean)
 # train: true
 
@@ -11,16 +9,16 @@ data: "/Users/ifioravanti/projects/wine_variety_classification/train/data"
 # The PRNG seed
 seed: 234
 
-fine_tune_type: full
+fine_tune_type: lora
 
 # Number of layers to fine-tune+
 num_layers: -1
 
 # Minibatch size.
-batch_size: 16
+batch_size: 8
 
 # Iterations to train for.
-iters: 1000
+iters: 4000
 
 # Number of validation batches, -1 uses the entire validation set.
 val_batches: 10
@@ -29,10 +27,10 @@ val_batches: 10
 learning_rate: 1e-5
 
 # Number of training steps between loss reporting.
-steps_per_report: 25
+steps_per_report: 10
 
 # Number of training steps between validations.
-steps_per_eval: 101
+steps_per_eval: 100
 
 # Load path to resume training with the given adapter weights.
 # resume_adapter_file: "/Users/ifioravanti/adapters/adapters.safetensors"

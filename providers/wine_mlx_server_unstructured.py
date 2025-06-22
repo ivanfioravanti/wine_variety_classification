@@ -36,7 +36,8 @@ parser = argparse.ArgumentParser(
 )
 
 # Define default models for mlx_omni_server provider
-DEFAULT_MODELS = ["mlx-community/Qwen3-0.6B-bf16"]
+# DEFAULT_MODELS = ["mlx-community/Qwen3-0.6B-bf16"]
+DEFAULT_MODELS = ["mlx-community/Qwen3-0.6B-4bit"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -91,7 +92,7 @@ def call_model(model, prompt):
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.7, 
-        "extra_body" : { "adapters": "/Users/ifioravanti/adapters" }
+        "extra_body" : { "adapters": "/Users/ifioravanti/projects/wine_variety_classification/adapters" }
     }
 
     response = client.chat.completions.create(**kwargs)

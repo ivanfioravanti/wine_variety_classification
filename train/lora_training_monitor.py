@@ -235,69 +235,47 @@ def monitor_training_output(config_path: str):
     
     last_saved_adapter = None
     adapter_dir = Path(monitor.config.get("adapter_path", "adapters"))
+    pending_validation = None  # Store (iteration, val_loss) until after save
+    ran_initial_validation = False  # Track if we've run the initial validation
     
     try:
         for line in process.stdout:
             # Print original output
             print(line, end='', flush=True)
             
-            # Check for saved adapter
-            save_match = save_pattern.search(line)
-            if save_match:
-                last_saved_adapter = save_match.group(1)
-                
             # Check for validation line
             val_match = val_pattern.search(line)
             if val_match:
                 iteration = int(val_match.group(1))
                 val_loss = float(val_match.group(2))
-                
-                # Try to find the most recent adapter file
-                adapter_path = None
-                if last_saved_adapter:
-                    adapter_path = last_saved_adapter
-                else:
-                    # Look for MLX-style adapter files (format: XXXXXXX_adapters.safetensors)
-                    # where XXXXXXX is the padded iteration number
-                    padded_iter = f"{iteration:07d}"
-                    specific_adapter = adapter_dir / f"{padded_iter}_adapters.safetensors"
-                    
-                    if specific_adapter.exists():
-                        adapter_path = str(specific_adapter)
-                    else:
-                        # Look for any adapter file with iteration <= current
-                        all_adapters = sorted(adapter_dir.glob("*_adapters.safetensors"))
-                        for adapter in reversed(all_adapters):
-                            try:
-                                # Extract iteration from filename (e.g., "0000050_adapters.safetensors")
-                                iter_str = adapter.stem.split('_')[0]
-                                file_iter = int(iter_str)
-                                if file_iter <= iteration:
-                                    adapter_path = str(adapter)
-                                    break
-                            except (ValueError, IndexError):
-                                continue
-                
-                # Load model and generate outputs
-                # Always use base model for first validation iteration
-                if iteration <= monitor.config.get('save_every', 50):
-                    # First validation - use base model
-                    print(f"First validation (iteration {iteration}), using base model without adapters")
+                pending_validation = (iteration, val_loss)
+
+                # Run initial validation after Iter 1, only once
+                if not ran_initial_validation and iteration == 1:
+                    ran_initial_validation = True
+                    print(f"Initial validation (iteration {iteration}), using base model without adapters")
                     if monitor.load_model_with_adapter(None):
                         monitor.generate_outputs(iteration, val_loss)
+
+            # Check for saved adapter
+            save_match = save_pattern.search(line)
+            if save_match and pending_validation:
+                last_saved_adapter = save_match.group(1)
+                iteration, val_loss = pending_validation
+                pending_validation = None
+
+                # Try to find the most recent adapter file
+                adapter_path = last_saved_adapter
+                # Load model and generate outputs
+                if adapter_dir.exists() and (adapter_dir / "adapters.safetensors").exists():
+                    print(f"Using adapter directory: {adapter_dir}")
+                    if monitor.load_model_with_adapter(str(adapter_dir)):
+                        monitor.generate_outputs(iteration, val_loss)
                 else:
-                    # For subsequent validations, try to use the adapter directory
-                    # MLX stores adapters in a directory, not a single file
-                    if adapter_dir.exists() and (adapter_dir / "adapters.safetensors").exists():
-                        print(f"Using adapter directory: {adapter_dir}")
-                        if monitor.load_model_with_adapter(str(adapter_dir)):
-                            monitor.generate_outputs(iteration, val_loss)
-                    else:
-                        # No adapter saved yet - use base model
-                        print(f"No adapter directory found at iteration {iteration}, using base model")
-                        if monitor.load_model_with_adapter(None):
-                            monitor.generate_outputs(iteration, val_loss)
-                    
+                    print(f"No adapter directory found at iteration {iteration}, using base model")
+                    if monitor.load_model_with_adapter(None):
+                        monitor.generate_outputs(iteration, val_loss)
+
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user.")
         process.terminate()
