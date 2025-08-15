@@ -27,6 +27,7 @@ import mlx.core as mx
 import yaml
 from mlx_lm import generate, load
 from mlx_lm.sample_utils import make_sampler
+from transformers import AutoTokenizer
 
 # Suppress tqdm progress bars
 os.environ['TQDM_DISABLE'] = '0'
@@ -135,27 +136,70 @@ class ValidationMonitor:
         for i, sample in enumerate(selected_samples):
             prompt = sample.get("prompt", "").strip()
             expected = sample.get("completion", "").strip()
-            
+
+            # Support both completions and text-style datasets
+            if (not prompt) and sample.get("text"):
+                text_full = sample.get("text", "").strip()
+                # Try to extract the expected JSON from end of text
+                json_in_text = re.search(r"\{[^{}]*\"variety\"[^{}]*:[^{}]*\"[^\"]*\"[^{}]*\}(?!.*\{)", text_full, re.DOTALL)
+                if json_in_text:
+                    expected = json_in_text.group().strip()
+                    prompt = text_full[: text_full.rfind(expected)].strip()
+                else:
+                    expected = ""
+                    prompt = text_full
+
             if not prompt:
                 continue
-                
+
             print(f"\n[Sample {i+1}]")
             # print(f"📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
             
             try:
-                # Apply chat template if available
-                if hasattr(self.tokenizer, 'apply_chat_template'):
-                    messages = [{"role": "user", "content": prompt}]
-                    formatted_prompt = self.tokenizer.apply_chat_template(
-                        messages,
-                        tokenize=False,
-                        add_generation_prompt=True
+
+                # Apply chat template only if tokenizer has template and prompt isn't already chat-formatted
+                formatted_prompt = prompt
+                has_template = bool(getattr(self.tokenizer, "chat_template", None))
+                if has_template and hasattr(self.tokenizer, 'apply_chat_template'):
+                    looks_chat_formatted = (
+                        "<start_of_turn>" in prompt or "<|im_start|>" in prompt
                     )
-                else:
-                    formatted_prompt = prompt
+                    if not looks_chat_formatted:
+                        messages = [{"role": "user", "content": prompt}]
+                        formatted_prompt = self.tokenizer.apply_chat_template(
+                            messages,
+                            tokenize=False,
+                            add_generation_prompt=True
+                        )
                 
-                # Create sampler with low temperature for deterministic output
-                sampler = make_sampler(temp=0.1, top_p=0.9)
+                # Create sampler with requested generation parameters
+                # Temperature: 1.0, Top-K: 64, Min-P: 0.0, Top-P: 0.95, Repetition Penalty: 1.0
+                # Be robust to different mlx_lm versions by introspecting supported kwargs.
+                try:
+                    import inspect
+                    supported = set()
+                    try:
+                        supported = set(inspect.signature(make_sampler).parameters.keys())
+                    except Exception:
+                        supported = set()
+                    kwargs = {}
+                    if 'temp' in supported:
+                        kwargs['temp'] = 1.0
+                    if 'top_p' in supported:
+                        kwargs['top_p'] = 0.95
+                    if 'top_k' in supported:
+                        kwargs['top_k'] = 64
+                    if 'min_p' in supported:
+                        kwargs['min_p'] = 0.0
+                    # repetition penalty key may vary by version
+                    if 'repetition_penalty' in supported:
+                        kwargs['repetition_penalty'] = 1.0
+                    elif 'repeat_penalty' in supported:
+                        kwargs['repeat_penalty'] = 1.0
+                    sampler = make_sampler(**kwargs) if kwargs else make_sampler()
+                except Exception:
+                    # Fallback in case of unexpected issues
+                    sampler = make_sampler(temp=1.0, top_p=0.95)
                 
                 # Generate completion using MLX generate function
                 response = generate(
@@ -230,13 +274,120 @@ class ValidationMonitor:
         print(f"{'='*80}\n")
 
 
+def _extract_user_text_from_prompt(prompt: str) -> str:
+    """Extract the user portion from a chat-formatted prompt if present.
+
+    Supports Gemma (<start_of_turn>user ... <end_of_turn>) and
+    Qwen (<|im_start|>user ... <|im_end|>) formats. Falls back to the
+    original string if no markers are found.
+    """
+    if "<start_of_turn>user" in prompt:
+        m = re.search(r"<start_of_turn>user\s*(.*?)\s*<end_of_turn>", prompt, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+    if "<|im_start|>user" in prompt:
+        m = re.search(r"<\|im_start\|>user\s*(.*?)\s*<\|im_end\|>", prompt, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+    return prompt.strip()
+
+
+def _extract_json_answer(text: str) -> str | None:
+    """Extract a JSON object containing a "variety" field from text."""
+    m = re.search(r"\{[^{}]*\"variety\"[^{}]*:[^{}]*\"[^\"]*\"[^{}]*\}", text, re.DOTALL)
+    return m.group(0) if m else None
+
+
+def ensure_config_and_data_compatibility(config_path: str) -> str:
+    """If the model tokenizer lacks a chat_template, convert dataset to text-only.
+
+    Returns the path to the config file to use (original or a patched copy).
+    """
+    try:
+        with open(config_path, 'r') as f:
+            cfg = yaml.safe_load(f)
+    except Exception as e:
+        print(f"⚠️ Failed to read config at {config_path}: {e}")
+        return config_path
+
+    model_id = cfg.get("model")
+    data_dir = cfg.get("data")
+    if not model_id or not data_dir:
+        return config_path
+
+    # Load only the tokenizer to check for chat template
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+        has_template = bool(getattr(tokenizer, "chat_template", None))
+    except Exception as e:
+        print(f"⚠️ Could not load tokenizer for '{model_id}' to detect chat template: {e}")
+        return config_path
+
+    if has_template:
+        # Instruct/chat model – existing prompt/completion format works
+        return config_path
+
+    # Base model: convert dataset to plain text samples
+    src = Path(data_dir)
+    if not src.exists():
+        print(f"⚠️ Data directory not found: {src}")
+        return config_path
+
+    dst = src.parent / (src.name + "_text")
+    dst.mkdir(parents=True, exist_ok=True)
+
+    def convert_split(name: str):
+        in_path = src / f"{name}.jsonl"
+        out_path = dst / f"{name}.jsonl"
+        if not in_path.exists():
+            return
+        try:
+            with open(in_path, 'r') as fin, open(out_path, 'w') as fout:
+                for line in fin:
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    prompt = rec.get("prompt", "")
+                    completion = rec.get("completion", "")
+                    if not prompt and rec.get("text"):
+                        # Already text dataset – copy through
+                        fout.write(json.dumps({"text": rec["text"]}) + "\n")
+                        continue
+                    user_text = _extract_user_text_from_prompt(str(prompt))
+                    answer_json = _extract_json_answer(str(completion)) or str(completion).strip()
+                    text = (user_text + "\n" + answer_json).strip()
+                    fout.write(json.dumps({"text": text}) + "\n")
+        except Exception as e:
+            print(f"⚠️ Failed converting split '{name}': {e}")
+
+    for split in ("train", "valid", "test"):
+        convert_split(split)
+
+    # Write a patched config referencing the text dataset
+    patched_cfg = dict(cfg)
+    patched_cfg["data"] = str(dst)
+    patched_path = Path(config_path).with_suffix("")
+    patched_path = patched_path.with_name(patched_path.name + ".base_text.yaml")
+    try:
+        with open(patched_path, 'w') as f:
+            yaml.safe_dump(patched_cfg, f)
+        print(f"🛠️ Base model detected. Using text dataset at: {dst}")
+        return str(patched_path)
+    except Exception as e:
+        print(f"⚠️ Failed to write patched config, using original: {e}")
+        return config_path
+
 def monitor_training_output(config_path: str):
     """Monitor MLX training output and inject validation outputs."""
     
-    monitor = ValidationMonitor(config_path)
+    # Ensure dataset and config are compatible with the model (base vs instruct)
+    effective_config_path = ensure_config_and_data_compatibility(config_path)
+
+    monitor = ValidationMonitor(effective_config_path)
     
     # Build MLX command with environment to suppress progress bars
-    cmd = ["mlx_lm.lora", "--config", config_path, "--train"]
+    cmd = ["mlx_lm.lora", "--config", effective_config_path, "--train"]
     
     # Set up environment to suppress tqdm
     env = os.environ.copy()

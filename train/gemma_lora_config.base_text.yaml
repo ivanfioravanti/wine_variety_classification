@@ -1,0 +1,45 @@
+adapter_path: adapters
+batch_size: 32
+data: /Users/ifioravanti/projects/wine_variety_classification/train/data_text
+fine_tune_type: full
+grad_checkpoint: false
+iters: 16000
+learning_rate: 4e-5
+lora_parameters:
+  dropout: 0
+  keys:
+  - self_attn.k_proj"
+  - self_attn.v_proj
+  - self_attn.q_proj
+  - self_attn.o_proj
+  - mlp.gate_proj
+  - mlp.down_proj
+  - mlp.up_proj
+  rank: 64
+  scale: 20
+lr_schedule:
+  arguments:
+  - 1e-4
+  - 300
+  - 4e-5
+  name: cosine_decay
+  warmup: 50
+  warmup_init: 5e-5
+max_seq_length: 512
+model: google/gemma-3-270m
+num_layers: -1
+optimizer: adafactor
+optimizer_config:
+  adafactor:
+    clip_threshold: 1.0
+    decay_rate: -0.997
+    relative_step: false
+    scale_parameter: true
+save_every: 100
+seed: 234
+steps_per_eval: 100
+steps_per_report: 10
+test: false
+test_batches: 100
+val_batches: 10
+wandb: mlx-finetuning

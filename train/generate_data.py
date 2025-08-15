@@ -5,6 +5,18 @@ import json
 import random
 import argparse
 
+# Optional: if present, use RANDOM_SEED from config for reproducibility
+try:
+    from config import RANDOM_SEED  # noqa: F401
+    random.seed(RANDOM_SEED)
+except Exception:
+    pass
+
+try:
+    from config import CHAT_TEMPLATE as DEFAULT_CHAT_TEMPLATE  # noqa: F401
+except Exception:
+    DEFAULT_CHAT_TEMPLATE = "gemma"
+
 # Set up argument parser
 parser = argparse.ArgumentParser(
     description="Generate training data for wine variety classification"
@@ -13,6 +25,12 @@ parser.add_argument(
     "--all-countries",
     action="store_true",
     help="Process wines from all countries instead of filtering by country",
+)
+parser.add_argument(
+    "--template",
+    choices=["plain", "gemma", "qwen"],
+    default=DEFAULT_CHAT_TEMPLATE,
+    help="Output prompt format: plain (default before), gemma (Gemma 3 chat), or qwen",
 )
 args = parser.parse_args()
 
@@ -38,7 +56,41 @@ varieties_less_than_five_list = (
 df_filtered = df_filtered[~df_filtered["variety"].isin(varieties_less_than_five_list)]
 
 
-def create_wine_sample(row):
+def _format_prompt_completion(template: str, user_text: str, assistant_text: str) -> tuple[str, str]:
+    """Return (prompt, completion) according to the selected chat template.
+
+    - plain: no special tokens; completion is assistant_text
+    - gemma: uses <start_of_turn>/<end_of_turn> with roles user/model
+    - qwen: uses <|im_start|>/<|im_end|> with roles user/assistant
+    """
+    if template == "gemma":
+        # Gemma 3 recommended chat format
+        prompt = (
+            "<start_of_turn>system\n"
+            "You are a helpful assistant that predicts the wine grape variety from a review.\n"
+            "<end_of_turn>\n"
+            "<start_of_turn>user\n" + user_text.strip() + "\n<end_of_turn>\n"
+            "<start_of_turn>model\n"
+        )
+        completion = assistant_text.strip() + "\n<end_of_turn>"
+        return prompt, completion
+    if template == "qwen":
+        # Qwen chat template
+        prompt = (
+            "<|im_start|>system\n"
+            "You are a helpful assistant that predicts the wine grape variety from a review.\n"
+            "<|im_end|>\n"
+            "<|im_start|>user\n" + user_text.strip() + "\n<|im_end|>\n"
+            "<|im_start|>assistant\n"
+        )
+        completion = assistant_text.strip() + "\n<|im_end|>"
+        return prompt, completion
+
+    # plain/default
+    return user_text.strip(), assistant_text.strip()
+
+
+def create_wine_sample(row, template: str):
     # Handle potential missing values with empty strings to avoid None errors
     winery = row.get("winery", "")
     province = row.get("province", "")
@@ -49,20 +101,22 @@ def create_wine_sample(row):
     points = row.get("points", "")
     price = row.get("price", "")
 
-    prompt = f"""Based on this wine review, guess the grape variety:
-This wine is produced by {winery} in the {province} region of {country}.
-It was grown in {region_1}. It is described as: "{description}".
-The wine has been reviewed by {taster_name} and received {points} points.
-The price is {price}"""
+    user_text = (
+        "Based on this wine review, guess the grape variety:\n"
+        f"This wine is produced by {winery} in the {province} region of {country}.\n"
+        f"It was grown in {region_1}. It is described as: \"{description}\".\n"
+        f"The wine has been reviewed by {taster_name} and received {points} points.\n"
+        f"The price is {price}"
+    )
 
-    completion_template = {
-        "variety": row["variety"],
-    }
-    return {"prompt": prompt, "completion": json.dumps(completion_template)}
+    assistant_text = json.dumps({"variety": row["variety"]})
+
+    prompt, completion = _format_prompt_completion(template, user_text, assistant_text)
+    return {"prompt": prompt, "completion": completion}
 
 
 print("Processing wine data...")
-all_data = [create_wine_sample(row) for _, row in df_filtered.iterrows()]
+all_data = [create_wine_sample(row, args.template) for _, row in df_filtered.iterrows()]
 random.shuffle(all_data)
 
 # Calculate split sizes

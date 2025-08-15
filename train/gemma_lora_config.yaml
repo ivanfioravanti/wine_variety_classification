@@ -36,7 +36,7 @@ steps_per_eval: 100
 # resume_adapter_file: "/Users/ifioravanti/adapters/adapters.safetensors"
 
 # Save/load path for the trained adapter weights.
-adapter_path: "adamw"
+adapter_path: "adapters"
 
 # Save the model every N iterations.
 save_every: 100
