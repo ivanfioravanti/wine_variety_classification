@@ -1,5 +1,5 @@
 # The path to the local model directory or Hugging Face repo.
-model: "mlx-community/Qwen3-0.6B-bf16"
+model: "google/gemma-3-270m-it"
 # Whether or not to train (boolean)
 # train: true
 
@@ -15,7 +15,7 @@ fine_tune_type: full
 num_layers: -1
 
 # Minibatch size.
-batch_size: 16
+batch_size: 32
 
 # Iterations to train for.
 iters: 16000
@@ -24,7 +24,7 @@ iters: 16000
 val_batches: 10
 
 # Adam learning rate.
-learning_rate: 1e-5
+learning_rate: 4e-5
 
 # Number of training steps between loss reporting.
 steps_per_report: 10
@@ -36,7 +36,7 @@ steps_per_eval: 100
 # resume_adapter_file: "/Users/ifioravanti/adapters/adapters.safetensors"
 
 # Save/load path for the trained adapter weights.
-adapter_path: "adapters"
+adapter_path: "adamw"
 
 # Save the model every N iterations.
 save_every: 100
@@ -48,7 +48,7 @@ test: false
 test_batches: 100
 
 # Maximum sequence length.
-max_seq_length: 256
+max_seq_length: 512
 
 # Use gradient checkpointing to reduce memory use.
 grad_checkpoint: false
@@ -76,6 +76,6 @@ lr_schedule:
   name: cosine_decay
   warmup: 50 # 0 for no warmup
   warmup_init: 5e-5 # 0 if not specified
-  arguments: [1e-4, 500, 5e-5] # passed to scheduler
+  arguments: [1e-4, 300, 4e-5] # passed to scheduler
 
 wandb: "mlx-finetuning"

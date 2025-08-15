@@ -61,5 +61,5 @@ def prepare_wine_data(
     df = filter_by_country(df, country)
     df = remove_rare_varieties(df, min_count)
     df_subset = sample_rows(df, sample_size, random_state)
-    varieties = np.array(df["variety"].unique()).astype("str")
+    varieties = np.array(df_subset["variety"].unique()).astype("str")
     return df_subset, varieties

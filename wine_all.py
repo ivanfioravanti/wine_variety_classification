@@ -11,11 +11,15 @@ import argparse
 from providers import wine_anthropic
 from providers import wine_ollama
 from providers import wine_openai
+from providers import wine_openai_unstructured
+from providers import wine_openai_batching
 from providers import wine_gemini_genai
+from providers import wine_gemini_openai
 from providers import wine_openrouter
 from providers import wine_lmstudio
 from providers import wine_deepseek
 from providers import wine_mlx_server_unstructured
+from providers import wine_groq
 
 
 def generate_chart(summary_df, timestamp):
@@ -78,7 +82,7 @@ def generate_chart_from_summary(summary_path=None):
 
 
 def run_all_models():
-    # Create a timestamp for the results
+    # Create a timestamp for the. results
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Dictionary to store all results
@@ -86,6 +90,19 @@ def run_all_models():
 
     # List of all modules and their models
     module_models = [
+        (
+            wine_groq,
+            [
+                "qwen-qwq-32b",
+                "qwen-2.5-72b-instruct",
+                "qwen-2.5-32b-instruct", 
+                "qwen-2.5-7b-instruct",
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it"
+            ],
+        ),
         (
             wine_anthropic,
             [
@@ -104,9 +121,15 @@ def run_all_models():
             ],
         ),
         (wine_openai, ["gpt-4o", "gpt-4o-mini"]),
+        (wine_openai_unstructured, ["gpt-4o", "gpt-4o-mini"]),
+        (wine_openai_batching, ["gpt-4o", "gpt-4o-mini"]),
         (
             wine_gemini_genai,
             ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"],
+        ),
+        (
+            wine_gemini_openai,
+            ["gemini-1.5-flash", "gemini-1.5-pro"],
         ),
         (wine_openrouter, ["deepseek/deepseek-chat"]),
         (wine_lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),

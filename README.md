@@ -29,6 +29,7 @@ The project uses a dataset of Italian wines to test different LLMs' ability to p
 ## Features
 
 - Wine variety prediction using multiple LLM providers:
+  - [Groq](https://groq.com)
   - [Ollama](https://ollama.ai)
   - [OpenAI](https://openai.com)
   - [Google Gemini](https://gemini.google.com)
@@ -46,11 +47,12 @@ The project uses a dataset of Italian wines to test different LLMs' ability to p
 - Python 3.12+
 - Jupyter Notebook
 - API keys for various providers (store in `.env` file):
-  - OPENAI_API_KEY
-  - GEMINI_API_KEY
-  - OPENROUTER_API_KEY
-  - DEEPSEEK_API_KEY
-  - ANTHROPIC_API_KEY
+  - `GROQ_API_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `ANTHROPIC_API_KEY`
 
 ## Recommendations
 
@@ -86,6 +88,9 @@ The project uses the [Wine Reviews dataset](https://www.kaggle.com/datasets/zyni
 In the providers folder you will find the individual implementations for each provider.
 - `wine_openrouter.py` - Implementation using OpenRouter API
 - `wine_ollama.py` - Implementation using Ollama
+- `wine_groq.py` - Implementation using Groq API
+- `wine_openrouter.py` - Implementation using OpenRouter API
+- `wine_ollama.py` - Implementation using Ollama
 - `wine_gemini.py` - Implementation using Google Gemini
 - `wine_lmstudio.py` - Implementation using LM Studio
 - `wine_deepseek.py` - Implementation using DeepSeek
@@ -111,6 +116,9 @@ In the providers folder you will find the individual implementations for each pr
 You can run individual provider modules directly using Python's module syntax:
 
 ```bash
+# Run Groq provider
+python -m providers.wine_groq
+
 # Run MLX Omni Server provider
 python -m providers.wine_mlx_omni_server
 

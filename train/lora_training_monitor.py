@@ -2,6 +2,13 @@
 """
 A monitoring wrapper for MLX LoRA training that intercepts validation steps
 and prints decoded model outputs to track learning progress.
+
+COMPATIBILITY NOTES:
+- Works well with Qwen models (e.g., mlx-community/Qwen3-0.6B-4bit)
+- For Mistral models, use older versions like mistralai/Mistral-7B-Instruct-v0.1
+- Newer Mistral models (e.g., Mistral-Small-3.2-24B-Instruct-2506) may not be 
+  compatible due to Mistral3Config not being supported by current transformers library
+- If model loading fails, training will continue but validation monitoring will be disabled
 """
 
 import argparse
@@ -86,16 +93,37 @@ class ValidationMonitor:
                     
             self.current_adapter_path = adapter_path
             return True
+        except KeyError as e:
+            if "Mistral3Config" in str(e):
+                print(f"❌ Error: The model '{self.config['model']}' uses Mistral3Config which is not supported by the current transformers library.")
+                print("💡 Suggestions:")
+                print("   1. Use an older Mistral model like: 'mistralai/Mistral-7B-v0.1' or 'mistralai/Mistral-7B-Instruct-v0.1'")
+                print("   2. Update transformers library: pip install transformers --upgrade")
+                print("   3. Use a different model that's compatible with MLX")
+                print("   4. Training will continue but validation monitoring is disabled.")
+                return False
+            else:
+                print(f"❌ KeyError loading model/tokenizer: {e}")
+                print("💡 This might be a model compatibility issue. Training will continue but validation monitoring is disabled.")
+                return False
         except Exception as e:
-            print(f"Error loading model/adapter: {e}")
+            print(f"❌ Error loading model/adapter: {e}")
+            print("💡 Training will continue but validation monitoring is disabled.")
             return False
             
-    def generate_outputs(self, iteration: int, val_loss: float, num_samples: int = 5):
+    def generate_outputs(self, iteration: int, val_loss: float, num_samples: int = 3):
         """Generate and print sample outputs."""
         print(f"\n{'='*80}")
         print(f"📊 VALIDATION OUTPUTS - Iteration {iteration} | Loss: {val_loss:.4f}")
         print(f"Using adapter: {self.current_adapter_path if self.current_adapter_path else 'Base model (no adapter)'}")
         print(f"{'='*80}")
+        
+        # Check if model and tokenizer are loaded
+        if self.model is None or self.tokenizer is None:
+            print("❌ Validation monitoring is disabled due to model loading issues.")
+            print("   Training will continue normally.")
+            print(f"{'='*80}\n")
+            return
         
         if not self.validation_samples:
             print("No validation samples loaded.")
@@ -254,8 +282,12 @@ def monitor_training_output(config_path: str):
                 if not ran_initial_validation and iteration == 1:
                     ran_initial_validation = True
                     print(f"Initial validation (iteration {iteration}), using base model without adapters")
-                    if monitor.load_model_with_adapter(None):
-                        monitor.generate_outputs(iteration, val_loss)
+                    try:
+                        if monitor.load_model_with_adapter(None):
+                            monitor.generate_outputs(iteration, val_loss)
+                    except Exception as e:
+                        print(f"❌ Failed to run initial validation: {e}")
+                        print("   Training will continue without validation monitoring.")
 
             # Check for saved adapter
             save_match = save_pattern.search(line)
@@ -267,14 +299,18 @@ def monitor_training_output(config_path: str):
                 # Try to find the most recent adapter file
                 adapter_path = last_saved_adapter
                 # Load model and generate outputs
-                if adapter_dir.exists() and (adapter_dir / "adapters.safetensors").exists():
-                    print(f"Using adapter directory: {adapter_dir}")
-                    if monitor.load_model_with_adapter(str(adapter_dir)):
-                        monitor.generate_outputs(iteration, val_loss)
-                else:
-                    print(f"No adapter directory found at iteration {iteration}, using base model")
-                    if monitor.load_model_with_adapter(None):
-                        monitor.generate_outputs(iteration, val_loss)
+                try:
+                    if adapter_dir.exists() and (adapter_dir / "adapters.safetensors").exists():
+                        print(f"Using adapter directory: {adapter_dir}")
+                        if monitor.load_model_with_adapter(str(adapter_dir)):
+                            monitor.generate_outputs(iteration, val_loss)
+                    else:
+                        print(f"No adapter directory found at iteration {iteration}, using base model")
+                        if monitor.load_model_with_adapter(None):
+                            monitor.generate_outputs(iteration, val_loss)
+                except Exception as e:
+                    print(f"❌ Failed to run validation at iteration {iteration}: {e}")
+                    print("   Training continues without validation monitoring.")
 
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user.")
