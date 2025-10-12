@@ -1,8 +1,10 @@
-from anthropic import Anthropic
+import argparse
+import openai
 import time
 import json
 import os
 from tqdm import tqdm
+from openai import OpenAI
 import numpy as np
 import concurrent.futures
 from data_utils import prepare_wine_data
@@ -37,17 +39,12 @@ def load_jsonl_data(file_path="./train/data/test.jsonl"):
         return []
 
 # Define default models
-DEFAULT_MODELS = [
-    "claude-3-5-haiku-20241022",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-opus-20240229",
-]
+DEFAULT_MODELS = ["gpt-4.1-mini"]
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize the Anthropic client once with API key and timeout
-client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=20.0)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -77,32 +74,49 @@ def generate_prompt(index):
 def call_model(model, prompt):
     while True:
         try:
-            response = client.messages.create(
-                max_tokens=1024,
-                system="""
-                You're a sommelier expert and you know everything about wine. 
-                You answer precisely with the name of the variety/blend without any additional text,
-                using format { "variety" : "answer" }
-                """,
+            response = client.chat.completions.create(
+                model=model,
+                store=True,
                 messages=[
                     {
                         "role": "user",
-                        "content": prompt,
+                        "content": """
+                        You're a sommelier expert and you know everything about wine. 
+                        You answer precisely with the name of the variety/blend without any additional text,
+                        using format: { "variety" : "answer" }   
+                        don't add anything else, just the answer in the given format.
+                        Don't add json in front of the response.
+                        Don't forget key variety in the json result.
+                        These are wrong format of answers:
+                        {"Champagne Blend" : "answer"}
+                        {"Grenache"} - missing variety key
+                        {"Rosé"} - missing variety key
+                        Good ones are:
+                        { "variety": "Chardonnay" }
+                        {"variety" : "Bordeaux-style White Blend"}
+                        Here the prompt to analyze: 
+                    """
+                        + prompt,
                     },
                 ],
-                model=model,
             )
-            return json.loads(response.content[0].text.strip())["variety"]
-        except Exception as e:
-            print(f"Error processing model {model}: {str(e)}")
+            return json.loads(response.choices[0].message.content.strip())["variety"]
+        except openai.RateLimitError as e:
+            retry_after = 1  # Default to 1 second if no explicit time is provided
+            if (
+                hasattr(e, "response")
+                and e.response
+                and "retry-after" in e.response.headers
+            ):
+                retry_after = float(e.response.headers["retry-after"])
+            print(f"Rate limit exceeded. Retrying in {retry_after} seconds...")
+            time.sleep(retry_after)
 
 
 def process_example(index, row, model, df, progress_bar):
-    global progress_index
-
     try:
-        # Generate the prompt using the row
-        prompt = generate_prompt(row, varieties)
+        # Generate the prompt using the dataset index
+        prompt = generate_prompt(index)
 
         predicted_variety = call_model(model, prompt)
         df.at[index, model + "-variety"] = predicted_variety
@@ -115,20 +129,15 @@ def process_example(index, row, model, df, progress_bar):
 
         # Update the progress bar
         progress_bar.update(1)
-
-        progress_index += 1
     except Exception as e:
         print(f"Error processing model {model}: {str(e)}")
 
 
 def process_dataframe(df, model):
-    global progress_index
-    progress_index = 1  # Reset progress index
-
     # Create a tqdm progress bar
     with tqdm(total=len(df), desc="Processing rows") as progress_bar:
         # Process each example concurrently using ThreadPoolExecutor with limited workers
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
                 executor.submit(
                     process_example, index, row, model, df, progress_bar
@@ -156,22 +165,40 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    models_to_use = (
+        list(models) if models is not None and len(models) > 0 else DEFAULT_MODELS
+    )
     results = {}
+    final_df = None
 
     for model in models_to_use:
         print(f"Processing with {model}...")
-        df = process_dataframe(df_country_subset.copy(), model)
-        accuracy = get_accuracy(model, df)
+        working_df = process_dataframe(df_country_subset.copy(), model)
+        accuracy = get_accuracy(model, working_df)
         results[model] = {
             "accuracy": accuracy,
-            "sample_size": len(df),
+            "sample_size": len(working_df),
             "country": COUNTRY,
         }
         print(f"{model} accuracy: {accuracy * 100:.2f}%")
+        final_df = working_df if final_df is None else final_df
 
-    return df, results
+    return final_df, results
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run wine variety classification using raw OpenAI prompts"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        nargs="+",
+        help="Override the default model list",
+    )
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    run_provider()
+    arguments = parse_args()
+    run_provider(models=arguments.model)

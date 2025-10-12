@@ -4,6 +4,7 @@ from tqdm import tqdm
 import numpy as np
 from data_utils import prepare_wine_data
 import argparse
+import time
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Global variable to store data from JSONL file
@@ -34,10 +35,16 @@ def load_jsonl_data(file_path="./train/data/test.jsonl"):
 parser = argparse.ArgumentParser(
     description="Wine variety classification using MLX Server"
 )
+parser.add_argument(
+    "-m",
+    "--model",
+    action="append",
+    help="Model identifier to query (can be provided multiple times)",
+)
+args = parser.parse_args()
 
 # Define default models for mlx_omni_server provider
-# DEFAULT_MODELS = ["mlx-community/Qwen3-0.6B-bf16"]
-DEFAULT_MODELS = ["mlx-community/Qwen3-0.6B-4bit"]
+DEFAULT_MODELS = ["mlx-community/Qwen3-0.6B-bf16"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -260,7 +267,10 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    if models is None:
+        models_to_use = args.model if args.model else DEFAULT_MODELS
+    else:
+        models_to_use = list(models)
     results = {}
     
     processed_df = df_country_subset.copy() # Start with a copy
@@ -302,7 +312,9 @@ if __name__ == "__main__":
     if not jsonl_data:
         print("Exiting: No data loaded from JSONL file. Ensure 'test.jsonl' is present and valid.")
     else:
+        start_time = time.perf_counter()
         df_results, accuracies = run_provider()
+        elapsed = time.perf_counter() - start_time
         print("\nFinal Results:")
         for model, data in accuracies.items():
             print(f"  {model}:")
@@ -310,6 +322,7 @@ if __name__ == "__main__":
             print(f"    Sample Size: {data['sample_size']}")
             print(f"    Country: {data['country']}")
             print(f"    Total Tokens: {data['total_tokens']}")
+        print(f"  Total Time: {elapsed:.2f} seconds")
 
         # Optionally, save the DataFrame with all results to a CSV file
         # df_results.to_csv("wine_classification_results.csv", index=False)

@@ -1,5 +1,5 @@
 # The path to the local model directory or Hugging Face repo.
-model: "mlx-community/Qwen3-0.6B-4bit"
+model: "mlx-community/Qwen3-0.6B-bf16"
 # Whether or not to train (boolean)
 # train: true
 
@@ -7,15 +7,15 @@ model: "mlx-community/Qwen3-0.6B-4bit"
 data: "/Users/ifioravanti/projects/wine_variety_classification/train/data"
 
 # The PRNG seed
-seed: 234
+seed: 123
 
 fine_tune_type: lora
 
-# Number of layers to fine-tune+
+# Number of layers to fine-tune
 num_layers: -1
 
 # Minibatch size.
-batch_size: 8
+batch_size: 12
 
 # Iterations to train for.
 iters: 4000
@@ -65,15 +65,19 @@ lora_parameters:
   # The layer keys to apply LoRA to.
   # These will be applied for the last lora_layers
   keys: [self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.down_proj","mlp.up_proj"]
-  rank: 64
-  scale: 20
+  rank: 32
+  scale: 2
   dropout: 0
 
 # Schedule can only be specified in a config file, uncomment to use.
 lr_schedule:
   name: cosine_decay
-  warmup: 50 # 0 for no warmup
-  warmup_init: 5e-5 # 0 if not specified
-  arguments: [1e-4, 500, 5e-5] # passed to scheduler
+  warmup: 100 # 0 for no warmup
+  warmup_init: 1e-4 # 0 if not specified
+  arguments: [4e-4, 400, 1e-4] # passed to scheduler
 
 wandb: "mlx-finetuning"
+
+monitor_batch_size: 25
+monitor_sample_size: 100
+monitor_max_tokens: 32

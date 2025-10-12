@@ -4,6 +4,7 @@ from config import COUNTRY
 import json
 import random
 import argparse
+from datasets import DownloadMode, load_dataset
 
 # Set up argument parser
 parser = argparse.ArgumentParser(
@@ -17,24 +18,43 @@ parser.add_argument(
 args = parser.parse_args()
 
 # Load the wine dataset
-print("Loading wine dataset...")
-df = pd.read_csv("data/winemag-data-130k-v2.csv")
+print("Loading wine dataset from Hugging Face (spawn99/wine-reviews)...")
+
+
+def _compute_cache_dir():
+    hf_home = os.environ.get("HF_HOME")
+    datasets_cache = os.environ.get("HF_DATASETS_CACHE")
+
+    if datasets_cache:
+        return datasets_cache
+
+    if hf_home:
+        return os.path.join(hf_home, "datasets")
+
+    return None
+
+
+cache_dir = _compute_cache_dir()
+dataset = load_dataset(
+    "spawn99/wine-reviews",
+    split="train",
+    cache_dir=cache_dir,
+    download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
+)
+df = dataset.to_pandas()
 
 # Apply country filter only if --all-countries is not set
 if not args.all_countries:
     print(f"Filtering for wines from {COUNTRY}...")
-    df_filtered = df[df["country"] == COUNTRY]
+    df_filtered = df[df["country"].fillna("") == COUNTRY]
 else:
     print("Processing wines from all countries...")
     df_filtered = df
 
 # Filter out wines with less than 5 references of their grape variety
 print("Filtering rare varieties...")
-varieties_less_than_five_list = (
-    df_filtered["variety"]
-    .value_counts()[df_filtered["variety"].value_counts() < 5]
-    .index.tolist()
-)
+variety_counts = df_filtered["variety"].value_counts()
+varieties_less_than_five_list = variety_counts[variety_counts < 5].index.tolist()
 df_filtered = df_filtered[~df_filtered["variety"].isin(varieties_less_than_five_list)]
 
 

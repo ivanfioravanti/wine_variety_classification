@@ -1,3 +1,4 @@
+import argparse
 import openai
 import time
 import json
@@ -10,32 +11,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
-# Global variable to store data from JSONL file
-jsonl_data = []
-
-# Function to load data from JSONL file
-def load_jsonl_data(file_path="./train/data/test.jsonl"):
-    data = []
-    try:
-        with open(file_path, 'r') as f:
-            for line in f:
-                try:
-                    data.append(json.loads(line))
-                except json.JSONDecodeError as e:
-                    print(
-                        f"Warning: Skipping malformed JSON line in {file_path}: {line.strip()} - Error: {e}"
-                    )
-        if not data:
-            print(
-                f"Warning: No data loaded from {file_path}. File might be empty or all lines were malformed."
-            )
-        return data
-    except FileNotFoundError:
-        print(f"Error: {file_path} not found. Please ensure the file exists in the correct location.")
-        return []  # Return empty list if file not found
-    except Exception as e:
-        print(f"An unexpected error occurred while loading {file_path}: {e}")
-        return []
+# Column name for prompts in the Hugging Face dataset
+PROMPT_COLUMN = "prompt"
 
 # Define default models
 DEFAULT_MODELS = ["gpt-4o-mini"]
@@ -48,25 +25,28 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
 
-# Load and prepare the dataset
+# Load and prepare the dataset from Hugging Face
 df_country_subset, varieties = prepare_wine_data()
-
-# Load data from JSONL file at the beginning
-jsonl_data = load_jsonl_data()
+jsonl_data = df_country_subset.copy()
 
 
 def generate_prompt(index):
-    """Generates a prompt using the entry at the given index from the loaded JSONL data."""
-    if not jsonl_data:
-        raise ValueError("JSONL data is not loaded or is empty.")
+    """Return the prompt string for the given dataset index."""
+    if jsonl_data.empty:
+        raise ValueError("Dataset is not loaded or is empty.")
     if index >= len(jsonl_data):
-        raise IndexError(f"Index {index} is out of bounds for JSONL data with length {len(jsonl_data)}.")
+        raise IndexError(
+            f"Index {index} is out of bounds for dataset with length {len(jsonl_data)}."
+        )
 
-    entry = jsonl_data[index]
-    if "prompt" not in entry:
-        raise KeyError(f"Key 'prompt' not found in JSONL data at index {index}.")
+    entry = jsonl_data.iloc[index]
+    prompt_value = entry.get(PROMPT_COLUMN)
+    if not isinstance(prompt_value, str):
+        raise KeyError(
+            f"Column '{PROMPT_COLUMN}' missing or not a string at index {index}."
+        )
 
-    return entry["prompt"]
+    return prompt_value
 
 
 response_format = {
@@ -88,8 +68,8 @@ def create_batch_tasks(df, model):
     """Create batch tasks for wine classification."""
     tasks = []
 
-    for index, row in df.iterrows():
-        prompt = generate_prompt(row, varieties)
+    for index, _ in df.iterrows():
+        prompt = generate_prompt(index)
 
         task = {
             "custom_id": f"task-{index}",
@@ -217,7 +197,9 @@ def run_provider(models=None, batch_job_ids=None):
     Returns:
         Tuple of (DataFrame with results, accuracies for each model, dict of batch job IDs).
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    models_to_use = (
+        list(models) if models is not None and len(models) > 0 else DEFAULT_MODELS
+    )
     batch_job_ids = batch_job_ids or {}
     results = {}
     final_df = None
@@ -241,8 +223,46 @@ def run_provider(models=None, batch_job_ids=None):
     return final_df, results, job_ids
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run wine variety classification using OpenAI batch API"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        nargs="+",
+        help="Override the default model list to submit batch jobs",
+    )
+    parser.add_argument(
+        "--batch-job-id",
+        action="append",
+        metavar="MODEL=ID",
+        help=(
+            "Resume a batch job for a specific model using MODEL=JOB_ID syntax."
+        ),
+    )
+    return parser.parse_args()
+
+
+def _parse_job_ids(pairs):
+    job_dict = {}
+    if not pairs:
+        return job_dict
+    for item in pairs:
+        if "=" not in item:
+            raise ValueError(
+                f"Invalid batch job mapping '{item}'. Expected format MODEL=JOB_ID."
+            )
+        model_name, job_id = item.split("=", 1)
+        if not model_name or not job_id:
+            raise ValueError(
+                f"Invalid batch job mapping '{item}'. MODEL and JOB_ID must be non-empty."
+            )
+        job_dict[model_name] = job_id
+    return job_dict
+
+
 if __name__ == "__main__":
-    # Example of resuming a job:
-    # batch_job_ids = {"gpt-4o-mini": "your-batch-job-id"}
-    # final_df, results, job_ids = run_provider(batch_job_ids=batch_job_ids)
-    final_df, results, job_ids = run_provider()
+    args = parse_args()
+    job_ids = _parse_job_ids(args.batch_job_id)
+    final_df, results, job_ids = run_provider(models=args.model, batch_job_ids=job_ids)

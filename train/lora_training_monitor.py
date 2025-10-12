@@ -15,11 +15,11 @@ import threading
 import time
 from pathlib import Path
 from queue import Queue
+from typing import List, Optional, Sequence
 
 import mlx.core as mx
 import yaml
-from mlx_lm import generate, load
-from mlx_lm.sample_utils import make_sampler
+from mlx_lm import batch_generate, load
 
 # Suppress tqdm progress bars
 os.environ['TQDM_DISABLE'] = '0'
@@ -35,6 +35,10 @@ class ValidationMonitor:
         self.tokenizer = None
         self.validation_samples = []
         self.current_adapter_path = None
+        self.monitor_batch_size = int(self.config.get("monitor_batch_size", 50))
+        self.monitor_max_tokens = int(self.config.get("monitor_max_tokens", 64))
+        self.monitor_sample_size = int(self.config.get("monitor_sample_size", 100))
+        self.monitor_system_prompt = self.config.get("monitor_system_prompt")
         self._load_validation_samples()
         
     def _load_config(self):
@@ -51,6 +55,89 @@ class ValidationMonitor:
                 for line in f:
                     sample = json.loads(line)
                     self.validation_samples.append(sample)
+
+    def _encode_prompts(self, prompts: Sequence[str]) -> List[List[int]]:
+        if self.tokenizer is None:
+            raise RuntimeError("Tokenizer must be loaded before encoding prompts.")
+
+        encoded: List[List[int]] = []
+        has_chat_template = getattr(self.tokenizer, "chat_template", None) is not None
+
+        for prompt in prompts:
+            if not isinstance(prompt, str):
+                raise ValueError(
+                    f"Expected prompt to be a string, received {type(prompt)!r} instead."
+                )
+
+            if has_chat_template and hasattr(self.tokenizer, "apply_chat_template"):
+                messages = []
+                if self.monitor_system_prompt:
+                    messages.append({"role": "system", "content": self.monitor_system_prompt})
+                messages.append({"role": "user", "content": prompt})
+
+                rendered = self.tokenizer.apply_chat_template(
+                    messages,
+                    add_generation_prompt=True,
+                    tokenize=False,
+                )
+                input_ids = self.tokenizer.encode(rendered, add_special_tokens=False)
+            else:
+                combined = prompt
+                if self.monitor_system_prompt:
+                    combined = f"{self.monitor_system_prompt}\n\n{prompt}"
+                input_ids = self.tokenizer.encode(combined, add_special_tokens=True)
+
+            if not isinstance(input_ids, list):
+                raise ValueError("Tokenizer.encode must return a list of token ids.")
+
+            encoded.append(input_ids)
+
+        return encoded
+
+    @staticmethod
+    def _extract_variety(raw_text: str) -> Optional[str]:
+        if not raw_text:
+            return None
+
+        candidate = raw_text.strip()
+
+        try:
+            value = json.loads(candidate).get("variety")
+            if isinstance(value, str):
+                return value.strip()
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            pass
+
+        start = candidate.find("{")
+        end = candidate.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            snippet = candidate[start : end + 1]
+            try:
+                value = json.loads(snippet).get("variety")
+                if isinstance(value, str):
+                    return value.strip()
+            except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+                pass
+
+        return None
+
+    @staticmethod
+    def _parse_expected_variety(expected: str) -> Optional[str]:
+        if not expected:
+            return None
+
+        expected = expected.strip()
+        if not expected:
+            return None
+
+        try:
+            value = json.loads(expected).get("variety")
+            if isinstance(value, str):
+                return value.strip()
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            pass
+
+        return expected.strip().strip('"').strip('\'')
                     
     def load_model_with_adapter(self, adapter_path: str = None):
         """Load or reload model with current adapter weights."""
@@ -90,8 +177,9 @@ class ValidationMonitor:
             print(f"Error loading model/adapter: {e}")
             return False
             
-    def generate_outputs(self, iteration: int, val_loss: float, num_samples: int = 5):
+    def generate_outputs(self, iteration: int, val_loss: float, num_samples: Optional[int] = None):
         """Generate and print sample outputs."""
+        start_time = time.time()
         print(f"\n{'='*80}")
         print(f"📊 VALIDATION OUTPUTS - Iteration {iteration} | Loss: {val_loss:.4f}")
         print(f"Using adapter: {self.current_adapter_path if self.current_adapter_path else 'Base model (no adapter)'}")
@@ -101,104 +189,114 @@ class ValidationMonitor:
             print("No validation samples loaded.")
             return
         
-        # Randomly select samples
-        selected_samples = random.sample(self.validation_samples, min(num_samples, len(self.validation_samples)))
+        sample_count = min(
+            num_samples if num_samples is not None else self.monitor_sample_size,
+            len(self.validation_samples),
+        )
+
+        if sample_count == 0:
+            print("No validation samples available for batch evaluation.")
+            return
+
+        selected_samples = random.sample(self.validation_samples, sample_count)
+
+        prompts = [sample.get("prompt", "").strip() for sample in selected_samples]
+        valid_indices = [i for i, prompt in enumerate(prompts) if prompt]
+
+        if not valid_indices:
+            print("No valid prompts found in selected validation samples.")
+            return
+
+        prompts_to_run = [prompts[i] for i in valid_indices]
+        samples_to_run = [selected_samples[i] for i in valid_indices]
+
+        try:
+            encoded_prompts = self._encode_prompts(prompts_to_run)
+
+            batch_size = max(1, min(self.monitor_batch_size, len(encoded_prompts)))
+
+            responses = batch_generate(
+                self.model,
+                self.tokenizer,
+                encoded_prompts,
+                max_tokens=self.monitor_max_tokens,
+                verbose=False,
+                completion_batch_size=min(batch_size, len(encoded_prompts)),
+                prefill_batch_size=min(batch_size, len(encoded_prompts)),
+            )
+        except Exception as exc:
+            print(f"❌ Batch generation failed: {exc}")
+            return
+
+        correct = 0
+        total = len(samples_to_run)
+        detailed_results = []
+
+        for idx, (sample, response_text) in enumerate(zip(samples_to_run, responses.texts)):
+            prompt = prompts_to_run[idx]
+            expected_raw = sample.get("completion", "").strip()
+            expected_variety = self._parse_expected_variety(expected_raw) or ""
+
+            candidate_text = response_text.strip() if response_text else ""
+            json_match = re.search(r'\{[^{}]*"variety"[^{}]*:[^{}]*"[^"]*"[^{}]*\}', candidate_text)
+
+            predicted_display = candidate_text
+            predicted_variety = ""
+
+            if json_match:
+                predicted_display = json_match.group()
+                try:
+                    parsed = json.loads(predicted_display)
+                    predicted_variety = str(parsed.get("variety", "")).strip()
+                except (json.JSONDecodeError, TypeError, AttributeError):
+                    predicted_variety = predicted_display
+            else:
+                predicted_variety = candidate_text
+
+            expected_norm = expected_variety.lower()
+            predicted_norm = predicted_variety.lower()
+
+            is_correct = False
+            if expected_norm and predicted_norm:
+                if expected_norm == predicted_norm:
+                    is_correct = True
+                elif expected_norm in predicted_norm or predicted_norm in expected_norm:
+                    is_correct = True
+
+            if is_correct:
+                correct += 1
+
+            detailed_results.append(
+                {
+                    "prompt": prompt,
+                    "expected": expected_variety or expected_raw,
+                    "expected_raw": expected_raw,
+                    "predicted_display": predicted_display,
+                    "predicted_variety": predicted_variety,
+                    "raw_response": candidate_text,
+                    "is_correct": is_correct,
+                }
+            )
+
+        accuracy = (correct / total) if total else 0.0
+        total_time = time.time() - start_time
+
+        print(
+            f"✅ Accuracy: {accuracy * 100:.2f}% ({correct}/{total}) | "
+            f"Batch size: {self.monitor_batch_size} | Max tokens: {self.monitor_max_tokens} | "
+            f"Total time: {total_time:.2f}s"
+        )
         
-        for i, sample in enumerate(selected_samples):
-            prompt = sample.get("prompt", "").strip()
-            expected = sample.get("completion", "").strip()
-            
-            if not prompt:
-                continue
-                
-            print(f"\n[Sample {i+1}]")
-            # print(f"📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
-            
-            try:
-                # Apply chat template if available
-                if hasattr(self.tokenizer, 'apply_chat_template'):
-                    messages = [{"role": "user", "content": prompt}]
-                    formatted_prompt = self.tokenizer.apply_chat_template(
-                        messages,
-                        tokenize=False,
-                        add_generation_prompt=True
-                    )
-                else:
-                    formatted_prompt = prompt
-                
-                # Create sampler with low temperature for deterministic output
-                sampler = make_sampler(temp=0.1, top_p=0.9)
-                
-                # Generate completion using MLX generate function
-                response = generate(
-                    model=self.model,
-                    tokenizer=self.tokenizer,
-                    prompt=formatted_prompt,
-                    max_tokens=50,
-                    sampler=sampler,
-                    verbose=False  # Disable verbose output
-                )
-                
-                # Print raw response first (show what model actually generated)
-                print(f"🔍 Raw output: {repr(response[:300])}{'...' if len(response) > 300 else ''}")
-                
-                # Extract just the generated part (remove the prompt)
-                if response.startswith(formatted_prompt):
-                    generated = response[len(formatted_prompt):].strip()
-                elif response.startswith(prompt):
-                    generated = response[len(prompt):].strip()
-                else:
-                    # Sometimes the model doesn't include the prompt in response
-                    generated = response.strip()
-                
-                # Extract JSON from generated output (handle <think> tags)
-                # Look for JSON pattern - match from { to the matching }
-                json_match = re.search(r'\{[^{}]*"variety"[^{}]*:[^{}]*"[^"]*"[^{}]*\}', generated)
-                
-                if expected:
-                    # First determine if the answer is correct
-                    is_correct = False
-                    try:
-                        import json
-                        expected_data = json.loads(expected)
-                        expected_variety = expected_data.get("variety", "").lower()
-                        
-                        # Try to parse generated JSON too
-                        if json_match:
-                            generated_json = json_match.group()
-                            try:
-                                generated_data = json.loads(generated_json)
-                                generated_variety = generated_data.get("variety", "").lower()
-                            except:
-                                generated_variety = generated.lower()
-                        else:
-                            generated_json = generated
-                            generated_variety = generated.lower()
-                        
-                        # Check for exact match or substring match
-                        if expected_variety == generated_variety:
-                            is_correct = True
-                        elif expected_variety in generated_variety or generated_variety in expected_variety:
-                            is_correct = True
-                    except:
-                        # Fallback to simple string comparison
-                        if expected.strip().lower() in generated.lower():
-                            is_correct = True
-                    
-                    # Print with appropriate emoji
-                    if json_match:
-                        generated_json = json_match.group()
-                        emoji = "✅" if is_correct else "❌"
-                        print(f"{emoji} Generated: {generated_json}")
-                    else:
-                        emoji = "✅" if is_correct else "❌"
-                        print(f"{emoji} Generated: {generated[:150]}{'...' if len(generated) > 150 else ''}")
-                    
-                    print(f"📋 Expected: {expected[:150]}{'...' if len(expected) > 150 else ''}")
-                        
-            except Exception as e:
-                print(f"❌ Generation error: {e}")
-                
+        print("\nSample predictions:")
+        for res in detailed_results[:5]:
+            expected_disp = res["expected"] or "<unknown>"
+            predicted_disp = res["predicted_display"]
+            status = "✅" if res["is_correct"] else "❌"
+            print(
+                f"{status} Expected: {expected_disp} | Predicted: {predicted_disp[:150]}"
+                f"{'...' if len(predicted_disp) > 150 else ''}"
+            )
+
         print(f"{'='*80}\n")
 
 
@@ -213,7 +311,7 @@ def monitor_training_output(config_path: str):
     # Set up environment to suppress tqdm
     env = os.environ.copy()
     env['TQDM_DISABLE'] = '0'
-    
+
     print("Starting MLX LoRA training with validation monitoring...")
     print(f"Command: {' '.join(cmd)}")
     print("\nNote: Decoded outputs will be shown at each validation step.")
@@ -239,10 +337,20 @@ def monitor_training_output(config_path: str):
     ran_initial_validation = False  # Track if we've run the initial validation
     
     try:
+        suppress_next_warning_line = False
         for line in process.stdout:
+            if 'UnsupportedFieldAttributeWarning' in line:
+                suppress_next_warning_line = True
+                continue
+            if suppress_next_warning_line:
+                if 'warnings.warn' in line:
+                    suppress_next_warning_line = False
+                    continue
+                suppress_next_warning_line = False
+
             # Print original output
             print(line, end='', flush=True)
-            
+
             # Check for validation line
             val_match = val_pattern.search(line)
             if val_match:

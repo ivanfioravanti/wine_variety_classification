@@ -1,99 +1,78 @@
-import os
+import argparse
+from anthropic import Anthropic
 import time
 import json
-import openai
-from dotenv import load_dotenv
+import os
 from tqdm import tqdm
-from openai import OpenAI
 import numpy as np
 import concurrent.futures
 from data_utils import prepare_wine_data
+from dotenv import load_dotenv
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
-# Global variable to store data from JSONL file
-jsonl_data = []
 
-# Function to load data from JSONL file
-def load_jsonl_data(file_path="./train/data/test.jsonl"):
-    data = []
-    try:
-        with open(file_path, 'r') as f:
-            for line in f:
-                try:
-                    data.append(json.loads(line))
-                except json.JSONDecodeError as e:
-                    print(
-                        f"Warning: Skipping malformed JSON line in {file_path}: {line.strip()} - Error: {e}"
-                    )
-        if not data:
-            print(
-                f"Warning: No data loaded from {file_path}. File might be empty or all lines were malformed."
-            )
-        return data
-    except FileNotFoundError:
-        print(f"Error: {file_path} not found. Please ensure the file exists in the correct location.")
-        return []  # Return empty list if file not found
-    except Exception as e:
-        print(f"An unexpected error occurred while loading {file_path}: {e}")
-        return []
 
 # Define default models
-DEFAULT_MODELS = ["deepseek-chat"]
+DEFAULT_MODELS = [
+    "claude-3-5-haiku-20241022",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-opus-20240229",
+]
 
 # Load environment variables from .env file
 load_dotenv()
 
-client = OpenAI(
-    base_url="https://api.deepseek.com",
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-)
+# Initialize the Anthropic client once with API key and timeout
+client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=20.0)
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
 
-# Load and prepare the dataset
-df_country_subset, varieties = prepare_wine_data()
+# Column name for prompts in the Hugging Face dataset
+PROMPT_COLUMN = "prompt"
 
-# Load data from JSONL file at the beginning
-jsonl_data = load_jsonl_data()
+# Load and prepare the dataset from Hugging Face
+df_country_subset, varieties = prepare_wine_data()
+jsonl_data = df_country_subset.copy()
 
 
 def generate_prompt(index):
-    """Generates a prompt using the entry at the given index from the loaded JSONL data."""
-    if not jsonl_data:
-        raise ValueError("JSONL data is not loaded or is empty.")
+    """Return the prompt string for the given dataset index."""
+    if jsonl_data.empty:
+        raise ValueError("Dataset is not loaded or is empty.")
     if index >= len(jsonl_data):
-        raise IndexError(f"Index {index} is out of bounds for JSONL data with length {len(jsonl_data)}.")
+        raise IndexError(f"Index {index} is out of bounds for dataset with length {len(jsonl_data)}.")
 
-    entry = jsonl_data[index]
-    if "prompt" not in entry:
-        raise KeyError(f"Key 'prompt' not found in JSONL data at index {index}.")
+    entry = jsonl_data.iloc[index]
+    prompt_value = entry.get(PROMPT_COLUMN)
+    if not isinstance(prompt_value, str):
+        raise KeyError(
+            f"Column '{PROMPT_COLUMN}' missing or not a string at index {index}."
+        )
 
-    return entry["prompt"]
+    return prompt_value
 
 
 # Function to call the API and process the result for a single model (blocking call in this case)
 def call_model(model, prompt):
     while True:
         try:
-            response = client.chat.completions.create(
-                model=model,
+            response = client.messages.create(
+                max_tokens=1024,
+                system="""
+                You're a sommelier expert and you know everything about wine. 
+                You answer precisely with the name of the variety/blend without any additional text,
+                using format { "variety" : "answer" }
+                """,
                 messages=[
                     {
-                        "role": "system",
-                        "content": """
-                        You're a sommelier expert and you know everything about wine. 
-                        You answer precisely with the name of the variety/blend in JSON form without 
-                        any additional text.
-                        EXAMPLE JSON OUTPUT:
-                        { "variety" : "answer" }
-                        """,
+                        "role": "user",
+                        "content": prompt,
                     },
-                    {"role": "user", "content": prompt},
                 ],
-                response_format={"type": "json_object"},
+                model=model,
             )
-            return json.loads(response.choices[0].message.content.strip())["variety"]
+            return json.loads(response.content[0].text.strip())["variety"]
         except Exception as e:
             print(f"Error processing model {model}: {str(e)}")
 
@@ -102,8 +81,8 @@ def process_example(index, row, model, df, progress_bar):
     global progress_index
 
     try:
-        # Generate the prompt using the row
-        prompt = generate_prompt(row, varieties)
+        # Generate the prompt using the index
+        prompt = generate_prompt(index)
 
         predicted_variety = call_model(model, prompt)
         df.at[index, model + "-variety"] = predicted_variety
@@ -129,9 +108,7 @@ def process_dataframe(df, model):
     # Create a tqdm progress bar
     with tqdm(total=len(df), desc="Processing rows") as progress_bar:
         # Process each example concurrently using ThreadPoolExecutor with limited workers
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(500, SAMPLE_SIZE)
-        ) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = {
                 executor.submit(
                     process_example, index, row, model, df, progress_bar
@@ -159,7 +136,9 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    models_to_use = (
+        list(models) if models is not None and len(models) > 0 else DEFAULT_MODELS
+    )
     results = {}
 
     for model in models_to_use:
@@ -176,5 +155,19 @@ def run_provider(models=None):
     return df, results
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run wine variety classification with Anthropic models"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        nargs="+",
+        help="Override the default model list",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_provider()
+    arguments = parse_args()
+    run_provider(models=arguments.model)

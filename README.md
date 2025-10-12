@@ -62,7 +62,7 @@ The default configuration in `wine_all.py` includes some large models that may n
    - For LM Studio: Stick to 3B-7B models with 4-bit quantization
    - Cloud models (OpenAI, Anthropic, etc.) don't have local hardware requirements
 
-2. In individual provider files (e.g., `wine_ollama.py`), adjust model selections similarly
+2. In individual provider files (e.g., `ollama.py`), adjust model selections similarly
 
 Example model substitutions for lower-end hardware:
 - Replace "qwen2.5:72b-instruct" with "llama3.2"
@@ -76,7 +76,9 @@ In general feel free to add models available locally to Ollama or LM Studio.
 
 ## Dataset
 
-The project uses the [Wine Reviews dataset](https://www.kaggle.com/datasets/zynicide/wine-reviews) from Kaggle. Download and place it in a `data` folder in your project directory.
+The project now pulls the [spawn99/wine-reviews](https://huggingface.co/datasets/spawn99/wine-reviews) dataset directly from Hugging Face using the `datasets` library. The files are cached automatically according to your `HF_HOME` configuration (defaults to `~/.cache/huggingface` if unset), so you don't need to manually download or manage CSV files.
+
+If you already have local copies of the Kaggle CSVs, they can remain in place; the scripts will transparently use the Hugging Face dataset.
 
 ## Project Structure
 
@@ -84,56 +86,75 @@ The project uses the [Wine Reviews dataset](https://www.kaggle.com/datasets/zyni
 - `wine_all.py` - Implementation using all providers
 
 In the providers folder you will find the individual implementations for each provider.
-- `wine_openrouter.py` - Implementation using OpenRouter API
-- `wine_ollama.py` - Implementation using Ollama
-- `wine_gemini.py` - Implementation using Google Gemini
-- `wine_lmstudio.py` - Implementation using LM Studio
-- `wine_deepseek.py` - Implementation using DeepSeek
-- `wine_anthropic.py` - Implementation using Anthropic
-- `wine_openai.py` - Implementation using OpenAI (Structured)
-- `wine_openai_unstructured.py` - Implementation using OpenAI with unstructured processing.
+- `openrouter.py` - Implementation using OpenRouter API
+- `ollama.py` - Implementation using Ollama
+- `gemini.py` - Implementation using Google Gemini
+- `lmstudio.py` - Implementation using LM Studio
+- `deepseek.py` - Implementation using DeepSeek
+- `anthropic.py` - Implementation using Anthropic
+- `openai.py` - Implementation using OpenAI (Structured)
+- `openai_unstructured.py` - Implementation using OpenAI with unstructured processing.
 
-- `wine_mlx_omni_server.py` - Implementation using MLX Omni Server
+- `mlx_omni_server.py` - Implementation using MLX Omni Server
 
 ## Usage
 
 1. Clone the repository
-2. Install dependencies:
+2. Create a virtual environment (using [`uv`](https://docs.astral.sh/uv/)):
    ```bash
-   pip install ollama numpy pandas tqdm pydantic
+   uv venv .venv -p 3.13
+   source .venv/bin/activate
+   uv sync
    ```
-3. Set up your environment variables in `.env` file
-4. Download the dataset and place it in the `data` folder
-5. Run the Jupyter notebook or individual Python scripts
+3. Generate the dataset used for training:
+   ```bash
+   python -m train.generate_data
+   ```
+4. Run MLX LoRA training with live validation monitoring for `mlx-community/Qwen3-0.6B-bf16`:
+   ```bash
+   python ./train/lora_training_monitor.py -c ./train/qwen_lora_config.yaml
+   ```
+5. (Optional) Run the Jupyter notebook or individual Python scripts for provider comparisons
 
 ### Running Individual Providers
 
 You can run individual provider modules directly using Python's module syntax:
 
 ```bash
+# Run MLX batch inference provider
+python -m providers.mlx_batch
+
 # Run MLX Omni Server provider
-python -m providers.wine_mlx_omni_server
+python -m providers.mlx_omni_server
 
 # Run Ollama provider
-python -m providers.wine_ollama
+python -m providers.ollama
 
 # Run OpenAI provider (Structured)
-python -m providers.wine_openai
+python -m providers.openai
 
 # Run OpenAI Unstructured provider
-python -m providers.wine_openai_unstructured
+python -m providers.openai_unstructured
 
 
 # Run Anthropic provider
-python -m providers.wine_anthropic
+python -m providers.anthropic
 
 # Run other providers similarly:
-python -m providers.wine_gemini
-python -m providers.wine_deepseek
-python -m providers.wine_lmstudio
-python -m providers.wine_openrouter
+python -m providers.gemini
+python -m providers.deepseek
+python -m providers.lmstudio
+python -m providers.openrouter
 
 ```
+
+You can override the default MLX batch configuration by passing the model name and adapter path explicitly:
+
+```bash
+python -m providers.mlx_batch -m Qwen/Qwen3-0.6B -b 100 --adapter ./adapters
+```
+
+Here `-m` selects a custom model (`Qwen/Qwen3-0.6B`), `-b` adjusts the batch size, and `--adapter` points to an alternate LoRA adapter directory. Swap in any compatible model identifier or adapter path to suit your setup.
 
 To run all providers at once:
 ```bash

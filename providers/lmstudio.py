@@ -1,3 +1,4 @@
+import argparse
 from openai import OpenAI
 import json
 from tqdm import tqdm
@@ -5,60 +6,39 @@ import numpy as np
 from data_utils import prepare_wine_data
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
-# Global variable to store data from JSONL file
-jsonl_data = []
-
-# Function to load data from JSONL file
-def load_jsonl_data(file_path="./train/data/test.jsonl"):
-    data = []
-    try:
-        with open(file_path, 'r') as f:
-            for line in f:
-                try:
-                    data.append(json.loads(line))
-                except json.JSONDecodeError as e:
-                    print(
-                        f"Warning: Skipping malformed JSON line in {file_path}: {line.strip()} - Error: {e}"
-                    )
-        if not data:
-            print(
-                f"Warning: No data loaded from {file_path}. File might be empty or all lines were malformed."
-            )
-        return data
-    except FileNotFoundError:
-        print(f"Error: {file_path} not found. Please ensure the file exists in the correct location.")
-        return []  # Return empty list if file not found
-    except Exception as e:
-        print(f"An unexpected error occurred while loading {file_path}: {e}")
-        return []
+# Column name for prompts in the Hugging Face dataset
+PROMPT_COLUMN = "prompt"
 
 # Define default models for LMStudio provider
-DEFAULT_MODELS = ["phi-4"]
+DEFAULT_MODELS = ["openai/gpt-oss-20b"]
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
 
 client = OpenAI(base_url="http://localhost:1234/v1", api_key="secret")
 
-# Load and prepare the dataset
+# Load and prepare the dataset from Hugging Face
 df_country_subset, varieties = prepare_wine_data()
-
-# Load data from JSONL file at the beginning
-jsonl_data = load_jsonl_data()
+jsonl_data = df_country_subset.copy()
 
 
 def generate_prompt(index):
-    """Generates a prompt using the entry at the given index from the loaded JSONL data."""
-    if not jsonl_data:
-        raise ValueError("JSONL data is not loaded or is empty.")
+    """Return the prompt string for the given dataset index."""
+    if jsonl_data.empty:
+        raise ValueError("Dataset is not loaded or is empty.")
     if index >= len(jsonl_data):
-        raise IndexError(f"Index {index} is out of bounds for JSONL data with length {len(jsonl_data)}.")
+        raise IndexError(
+            f"Index {index} is out of bounds for dataset with length {len(jsonl_data)}."
+        )
 
-    entry = jsonl_data[index]
-    if "prompt" not in entry:
-        raise KeyError(f"Key 'prompt' not found in JSONL data at index {index}.")
+    entry = jsonl_data.iloc[index]
+    prompt_value = entry.get(PROMPT_COLUMN)
+    if not isinstance(prompt_value, str):
+        raise KeyError(
+            f"Column '{PROMPT_COLUMN}' missing or not a string at index {index}."
+        )
 
-    return entry["prompt"]
+    return prompt_value
 
 
 response_format = {
@@ -97,8 +77,8 @@ def process_example(index, row, model, df, progress_bar):
     global progress_index
 
     try:
-        # Generate the prompt using the row
-        prompt = generate_prompt(row, varieties)
+        # Generate the prompt using the index
+        prompt = generate_prompt(index)
 
         predicted_variety = call_model(model, prompt)
         df.at[index, model + "-variety"] = predicted_variety
@@ -145,7 +125,9 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    models_to_use = (
+        list(models) if models is not None and len(models) > 0 else DEFAULT_MODELS
+    )
     results = {}
 
     for model in models_to_use:
@@ -162,5 +144,19 @@ def run_provider(models=None):
     return df, results
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run wine variety classification using LMStudio"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        nargs="+",
+        help="Override the default LMStudio model list",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_provider()
+    arguments = parse_args()
+    run_provider(models=arguments.model)

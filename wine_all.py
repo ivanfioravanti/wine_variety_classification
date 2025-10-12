@@ -7,15 +7,15 @@ from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 import glob
 import argparse
 
-# Import all wine analysis modules
-from providers import wine_anthropic
-from providers import wine_ollama
-from providers import wine_openai
-from providers import wine_gemini_genai
-from providers import wine_openrouter
-from providers import wine_lmstudio
-from providers import wine_deepseek
-from providers import wine_mlx_server_unstructured
+# Import all provider modules
+from providers import anthropic
+from providers import ollama
+from providers import openai
+from providers import gemini_genai
+from providers import openrouter
+from providers import lmstudio
+from providers import deepseek
+from providers import mlx_server_unstructured
 
 
 def generate_chart(summary_df, timestamp):
@@ -87,7 +87,7 @@ def run_all_models():
     # List of all modules and their models
     module_models = [
         (
-            wine_anthropic,
+            anthropic,
             [
                 "claude-3-5-haiku-20241022",
                 "claude-3-5-sonnet-20241022",
@@ -95,7 +95,7 @@ def run_all_models():
             ],
         ),
         (
-            wine_ollama,
+            ollama,
             [
                 "llama3.1:latest",
                 "llama3.2:latest",
@@ -103,15 +103,15 @@ def run_all_models():
                 "qwen2.5:72b-instruct",
             ],
         ),
-        (wine_openai, ["gpt-4o", "gpt-4o-mini"]),
+        (openai, ["gpt-4o", "gpt-4o-mini"]),
         (
-            wine_gemini_genai,
+            gemini_genai,
             ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"],
         ),
-        (wine_openrouter, ["deepseek/deepseek-chat"]),
-        (wine_lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),
-        (wine_deepseek, ["deepseek-chat"]),
-        (wine_mlx_server_unstructured, ["mlx-community/Qwen3-0.6B-8bit","mlx-community/Qwen3-0.6B-bf16","mlx-community/Qwen3-1.7B-4bit", "mlx-community/Qwen3-1.7B-8bit",
+        (openrouter, ["deepseek/deepseek-chat"]),
+        (lmstudio, ["Llama-3.2-3B-Instruct-4bit"]),
+        (deepseek, ["deepseek-chat"]),
+        (mlx_server_unstructured, ["mlx-community/Qwen3-0.6B-8bit","mlx-community/Qwen3-0.6B-bf16","mlx-community/Qwen3-1.7B-4bit", "mlx-community/Qwen3-1.7B-8bit",
                   "mlx-community/Qwen3-4B-4bit", "mlx-community/Qwen3-4B-8bit", "mlx-community/Qwen3-8B-4bit", "mlx-community/Qwen3-8B-8bit",
                   "mlx-community/Qwen3-14B-4bit", "mlx-community/Qwen3-14B-8bit", "mlx-community/Qwen3-30B-A3B-4bit", "mlx-community/Qwen3-30B-A3B-8bit", 
                   "mlx-community/Qwen3-32B-4bit", "mlx-community/Qwen3-32B-8bit", "mlx-community/Qwen3-235B-A22B-4bit", "mlx-community/Qwen3-235B-A22B-8bit"]),

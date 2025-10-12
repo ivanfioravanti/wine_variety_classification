@@ -38,6 +38,12 @@ parser = argparse.ArgumentParser(
     description="Wine variety classification using MLX Omni Server"
 )
 parser.add_argument("--adapter-path", type=str, help="Path to fine-tuned adapter")
+parser.add_argument(
+    "-m",
+    "--model",
+    action="append",
+    help="Override the default model list (can be provided multiple times)",
+)
 args = parser.parse_args()
 
 # Define default models for mlx_omni_server provider
@@ -112,8 +118,8 @@ def process_example(index, row, model, df, progress_bar):
     global progress_index
 
     try:
-        # Generate the prompt using the row
-        prompt = generate_prompt(row, varieties)
+        # Generate the prompt using the dataset index
+        prompt = generate_prompt(index)
 
         predicted_variety = call_model(model, prompt)
         df.at[index, model + "-variety"] = predicted_variety
@@ -160,7 +166,10 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    if models is None:
+        models_to_use = args.model if args.model else DEFAULT_MODELS
+    else:
+        models_to_use = list(models)
     results = {}
 
     for model in models_to_use:

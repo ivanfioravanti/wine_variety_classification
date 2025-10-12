@@ -28,9 +28,9 @@ def test_call_model_returns_chardonnay():
         with patch("requests.post", return_value=mock_response) as mock_post:
             # Reload module with patched pandas.read_csv
             import sys
-            if "providers.wine_openrouter" in sys.modules:
-                del sys.modules["providers.wine_openrouter"]
-            openrouter = importlib.import_module("providers.wine_openrouter")
+            if "providers.openrouter" in sys.modules:
+                del sys.modules["providers.openrouter"]
+            openrouter = importlib.import_module("providers.openrouter")
             result = openrouter.call_model("model", "prompt")
             assert result == "Chardonnay"
             mock_post.assert_called_once()

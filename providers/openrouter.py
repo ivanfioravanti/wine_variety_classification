@@ -1,4 +1,6 @@
+import argparse
 import os
+import requests
 import time
 import json
 from dotenv import load_dotenv
@@ -6,9 +8,6 @@ from tqdm import tqdm
 import numpy as np
 import concurrent.futures
 from data_utils import prepare_wine_data
-from google import genai
-from google.genai import types
-from pydantic import BaseModel, Field
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Global variable to store data from JSONL file
@@ -39,12 +38,10 @@ def load_jsonl_data(file_path="./train/data/test.jsonl"):
         return []
 
 # Define default models
-DEFAULT_MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]
+DEFAULT_MODELS = ["deepseek/deepseek-chat"]
 
 # Load environment variables from .env file
 load_dotenv()
-
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -70,95 +67,82 @@ def generate_prompt(index):
     return entry["prompt"]
 
 
-class WineVariety(BaseModel):
-    variety: str = Field(enum=varieties.tolist())
+response_format = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "grape-variety",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {"variety": {"type": "string", "enum": varieties.tolist()}},
+            "additionalProperties": False,
+            "required": ["variety"],
+        },
+    },
+}
 
 
-# Function to call the API and process the result for a single model
-def call_model(model_name, prompt, timeout=5, max_retries=3):
-    def _generate():
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                system_instruction="You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
-                temperature=0,
-                response_schema=WineVariety,
-            ),
-        )
-        return json.loads(response.text.strip())["variety"]
-
-    retries = 0
-    while retries < max_retries:
-        executor = None
-        future = None
+# Function to call the API and process the result for a single model (blocking call in this case)
+def call_model(model, prompt, max_retries=3, timeout=10):
+    for attempt in range(max_retries):
         try:
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            future = executor.submit(_generate)
-            variety = future.result(
-                timeout=timeout
-            )  # This will raise TimeoutError if it takes too long
-
-            # Validate that the variety is in our list
-            if variety in varieties:
-                return variety
-            retries += 1  # Count invalid responses as retries
-
-        except concurrent.futures.TimeoutError:
-            print(
-                f"Timeout error for model {model_name}: Request took longer than {timeout} seconds (attempt {retries + 1}/{max_retries})"
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                },
+                data=json.dumps(
+                    {
+                        "model": model,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        "response_format": response_format,
+                    }
+                ),
+                timeout=timeout,
             )
-            retries += 1
-            time.sleep(1)  # Add a small delay before retrying
+            response_json = response.json()
+            content = response_json["choices"][0]["message"]["content"].strip()
+            return json.loads(content)["variety"]
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            if attempt == max_retries - 1:
+                print(
+                    f"Failed after {max_retries} attempts for model {model}: {str(e)}"
+                )
+                return "ERROR: Request timeout"
+            time.sleep(2**attempt)  # Exponential backoff
         except Exception as e:
-            print(
-                f"Error processing model {model_name}: {str(e)} (attempt {retries + 1}/{max_retries})"
-            )
-            retries += 1
-            time.sleep(1)  # Add a small delay before retrying
-        finally:
-            # Clean up the executor and cancel any pending future
-            if future is not None:
-                future.cancel()
-            if executor is not None:
-                executor.shutdown(wait=False)
-
-    raise Exception(f"Failed to get valid response after {max_retries} attempts")
+            print(f"Error processing model {model}: {str(e)}")
+            return f"ERROR: {str(e)}"
 
 
 def process_example(index, row, model, df, progress_bar):
-    global progress_index
-
     try:
-        # Generate the prompt using the row
-        prompt = generate_prompt(row, varieties)
-
-        predicted_variety = call_model(model, prompt)
-        df.at[index, model + "-variety"] = predicted_variety
+        prompt = generate_prompt(index)
+        result = call_model(model, prompt)
+        df.at[index, model + "-variety"] = result
 
         actual_variety = row["variety"]
-        if predicted_variety == actual_variety:
-            tqdm.write(f"✅ Predicted: {predicted_variety}, Actual: {actual_variety}")
+        if result == actual_variety:
+            tqdm.write(f"✅ Predicted: {result}, Actual: {actual_variety}")
         else:
-            tqdm.write(f"❌ Predicted: {predicted_variety}, Actual: {actual_variety}")
+            tqdm.write(f"❌ Predicted: {result}, Actual: {actual_variety}")
 
-        # Update the progress bar
         progress_bar.update(1)
-
-        progress_index += 1
     except Exception as e:
-        print(f"Error processing model {model}: {str(e)}")
+        print(f"Error processing example {index}: {str(e)}")
+        df.at[index, model + "-variety"] = f"ERROR: {str(e)}"
+        progress_bar.update(1)
 
 
 def process_dataframe(df, model):
-    global progress_index
-    progress_index = 1  # Reset progress index
-
-    # Create a tqdm progress bar
-    with tqdm(total=len(df), desc="Processing rows") as progress_bar:
-        # Process each example concurrently using ThreadPoolExecutor with limited workers
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with tqdm(total=len(df), desc=f"Processing {model}") as progress_bar:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
             futures = {
                 executor.submit(
                     process_example, index, row, model, df, progress_bar
@@ -168,9 +152,9 @@ def process_dataframe(df, model):
 
             for future in concurrent.futures.as_completed(futures):
                 try:
-                    future.result()  # Wait for each example to be processed
+                    future.result()
                 except Exception as e:
-                    print(f"Error processing example: {str(e)}")
+                    print(f"Unexpected error in future: {str(e)}")
     return df
 
 
@@ -186,7 +170,9 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    models_to_use = (
+        list(models) if models is not None and len(models) > 0 else DEFAULT_MODELS
+    )
     results = {}
 
     for model in models_to_use:
@@ -203,5 +189,19 @@ def run_provider(models=None):
     return df, results
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run wine variety classification using OpenRouter"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        nargs="+",
+        help="Override the default model list",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_provider()
+    arguments = parse_args()
+    run_provider(models=arguments.model)

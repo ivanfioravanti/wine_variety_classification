@@ -1,8 +1,13 @@
-from ollama import chat
+import argparse
+import os
+import time
+import json
+from dotenv import load_dotenv
 from tqdm import tqdm
 import numpy as np
+import concurrent.futures
 from data_utils import prepare_wine_data
-from pydantic import BaseModel, Field
+import google.generativeai as genai
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Global variable to store data from JSONL file
@@ -32,6 +37,15 @@ def load_jsonl_data(file_path="./train/data/test.jsonl"):
         print(f"An unexpected error occurred while loading {file_path}: {e}")
         return []
 
+# Define default models
+DEFAULT_MODELS = ["gemini-2.5-pro-preview-03-25"]
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure the Gemini API
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
 
@@ -56,33 +70,64 @@ def generate_prompt(index):
     return entry["prompt"]
 
 
-class WineVariety(BaseModel):
-    variety: str = Field(enum=varieties.tolist())
-
-
-# Function to call the API and process the result for a single model (blocking call in this case)
-def call_model(model, prompt):
-    response = chat(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
+# Function to call the API and process the result for a single model
+def call_model(model_name, prompt, timeout=5, max_retries=3):
+    def _generate():
+        model = genai.GenerativeModel(model_name)
+        system_prompt = "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend."
+        response = model.generate_content(
+            [system_prompt, prompt],
+            generation_config={
+                "temperature": 0,  # Use deterministic output
+                "candidate_count": 1,
             },
-            {"role": "user", "content": prompt},
-        ],
-        format=WineVariety.model_json_schema(),
-    )
-    wine_variety = WineVariety.model_validate_json(response.message.content)
-    return wine_variety.variety
+        )
+        return response.text.strip()
+
+    retries = 0
+    while retries < max_retries:
+        executor = None
+        future = None
+        try:
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(_generate)
+            variety = future.result(
+                timeout=timeout
+            )  # This will raise TimeoutError if it takes too long
+
+            # Validate that the variety is in our list
+            if variety in varieties:
+                return variety
+            retries += 1  # Count invalid responses as retries
+
+        except concurrent.futures.TimeoutError:
+            print(
+                f"Timeout error for model {model_name}: Request took longer than {timeout} seconds (attempt {retries + 1}/{max_retries})"
+            )
+            retries += 1
+            time.sleep(1)  # Add a small delay before retrying
+        except Exception as e:
+            print(
+                f"Error processing model {model_name}: {str(e)} (attempt {retries + 1}/{max_retries})"
+            )
+            retries += 1
+            time.sleep(1)  # Add a small delay before retrying
+        finally:
+            # Clean up the executor and cancel any pending future
+            if future is not None:
+                future.cancel()
+            if executor is not None:
+                executor.shutdown(wait=False)
+
+    raise Exception(f"Failed to get valid response after {max_retries} attempts")
 
 
 def process_example(index, row, model, df, progress_bar):
     global progress_index
 
     try:
-        # Generate the prompt using the row
-        prompt = generate_prompt(row, varieties)
+        # Generate the prompt using the dataset index
+        prompt = generate_prompt(index)
 
         predicted_variety = call_model(model, prompt)
         df.at[index, model + "-variety"] = predicted_variety
@@ -107,22 +152,25 @@ def process_dataframe(df, model):
 
     # Create a tqdm progress bar
     with tqdm(total=len(df), desc="Processing rows") as progress_bar:
-        # Process each example sequentially
-        for index, row in df.iterrows():
-            try:
-                process_example(index, row, model, df, progress_bar)
-            except Exception as e:
-                print(f"Error processing example: {str(e)}")
+        # Process each example concurrently using ThreadPoolExecutor with limited workers
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(
+                    process_example, index, row, model, df, progress_bar
+                ): index
+                for index, row in df.iterrows()
+            }
 
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()  # Wait for each example to be processed
+                except Exception as e:
+                    print(f"Error processing example: {str(e)}")
     return df
 
 
 def get_accuracy(model, df):
     return np.mean(df["variety"] == df[model + "-variety"])
-
-
-# Default models to use when running the provider directly
-DEFAULT_MODELS = ["llama3.2:latest", "llama3.3:latest"]
 
 
 def run_provider(models=None):
@@ -133,7 +181,9 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    models_to_use = (
+        list(models) if models is not None and len(models) > 0 else DEFAULT_MODELS
+    )
     results = {}
 
     for model in models_to_use:
@@ -150,5 +200,19 @@ def run_provider(models=None):
     return df, results
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run wine variety classification using Gemini generative models"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        nargs="+",
+        help="Override the default Gemini model list",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_provider()
+    arguments = parse_args()
+    run_provider(models=arguments.model)

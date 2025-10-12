@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 import json
@@ -6,7 +7,9 @@ from tqdm import tqdm
 import numpy as np
 import concurrent.futures
 from data_utils import prepare_wine_data
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+from pydantic import BaseModel, Field
 from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 # Global variable to store data from JSONL file
@@ -37,13 +40,12 @@ def load_jsonl_data(file_path="./train/data/test.jsonl"):
         return []
 
 # Define default models
-DEFAULT_MODELS = ["gemini-2.5-pro-preview-03-25"]
+DEFAULT_MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure the Gemini API
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Set random seed for reproducibility
 np.random.seed(RANDOM_SEED)
@@ -69,19 +71,24 @@ def generate_prompt(index):
     return entry["prompt"]
 
 
+class WineVariety(BaseModel):
+    variety: str = Field(enum=varieties.tolist())
+
+
 # Function to call the API and process the result for a single model
 def call_model(model_name, prompt, timeout=5, max_retries=3):
     def _generate():
-        model = genai.GenerativeModel(model_name)
-        system_prompt = "You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend."
-        response = model.generate_content(
-            [system_prompt, prompt],
-            generation_config={
-                "temperature": 0,  # Use deterministic output
-                "candidate_count": 1,
-            },
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                system_instruction="You're a sommelier expert and you know everything about wine. You answer precisely with the name of the variety/blend.",
+                temperature=0,
+                response_schema=WineVariety,
+            ),
         )
-        return response.text.strip()
+        return json.loads(response.text.strip())["variety"]
 
     retries = 0
     while retries < max_retries:
@@ -125,8 +132,8 @@ def process_example(index, row, model, df, progress_bar):
     global progress_index
 
     try:
-        # Generate the prompt using the row
-        prompt = generate_prompt(row, varieties)
+        # Generate the prompt using the dataset index
+        prompt = generate_prompt(index)
 
         predicted_variety = call_model(model, prompt)
         df.at[index, model + "-variety"] = predicted_variety
@@ -180,7 +187,9 @@ def run_provider(models=None):
     Returns:
         DataFrame with results and accuracies for each model.
     """
-    models_to_use = models if models is not None else DEFAULT_MODELS
+    models_to_use = (
+        list(models) if models is not None and len(models) > 0 else DEFAULT_MODELS
+    )
     results = {}
 
     for model in models_to_use:
@@ -197,5 +206,19 @@ def run_provider(models=None):
     return df, results
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run wine variety classification using Gemini GenAI client"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        nargs="+",
+        help="Override the default model list",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_provider()
+    arguments = parse_args()
+    run_provider(models=arguments.model)

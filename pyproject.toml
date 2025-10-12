@@ -1,0 +1,38 @@
+[project]
+name = "wine-variety-classification"
+version = "0.1.0"
+description = "Wine variety prediction experiments using large language models."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "tqdm>=4.65.0",
+    "pydantic==2.11.0",
+    "python-dotenv>=1.0.0",
+    "google-genai>=0.3.0",
+    "requests>=2.31.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "openai>=1.6.0",
+    "pillow>=10.0.0",
+    "scikit-learn>=1.3.0",
+    "google-generativeai>=0.8.3",
+    "datasets>=2.19.0",
+    "mlx-lm>=0.14.0",
+    "wandb>=0.22.2",
+]
+
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+include = ["providers*", "train*"]
+
+[tool.setuptools]
+py-modules = ["config", "data_utils", "final_plot", "wine_all"]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
