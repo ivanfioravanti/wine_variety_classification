@@ -35,6 +35,10 @@ class ValidationMonitor:
         self.tokenizer = None
         self.validation_samples = []
         self.current_adapter_path = None
+        self.monitor_enabled = bool(self.config.get("monitor_enabled", True))
+        self.monitor_initial_validation = bool(
+            self.config.get("monitor_initial_validation", True)
+        )
         self.monitor_batch_size = int(self.config.get("monitor_batch_size", 50))
         self.monitor_max_tokens = int(self.config.get("monitor_max_tokens", 64))
         self.monitor_sample_size = int(self.config.get("monitor_sample_size", 100))
@@ -300,10 +304,63 @@ class ValidationMonitor:
         print(f"{'='*80}\n")
 
 
+def run_single_validation(
+    config_path: str,
+    iteration: int,
+    val_loss: float,
+    adapter_path: Optional[str] = None,
+) -> int:
+    """Run one decoded validation pass in an isolated process."""
+    monitor = ValidationMonitor(config_path)
+    if not monitor.load_model_with_adapter(adapter_path):
+        return 1
+
+    monitor.generate_outputs(iteration, val_loss)
+    return 0
+
+
+def run_validation_subprocess(
+    script_path: Path,
+    config_path: str,
+    iteration: int,
+    val_loss: float,
+    env: dict,
+    adapter_path: Optional[str] = None,
+) -> int:
+    """Spawn decoded validation in a subprocess so OOMs do not kill training."""
+    cmd = [
+        sys.executable,
+        str(script_path),
+        "--config",
+        config_path,
+        "--run-single-validation",
+        "--iteration",
+        str(iteration),
+        "--val-loss",
+        str(val_loss),
+    ]
+    if adapter_path:
+        cmd.extend(["--adapter-path", adapter_path])
+
+    completed = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+    )
+
+    if completed.returncode == 0 and completed.stdout:
+        print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
+
+    return completed.returncode
+
+
 def monitor_training_output(config_path: str):
     """Monitor MLX training output and inject validation outputs."""
     
     monitor = ValidationMonitor(config_path)
+    script_path = Path(__file__).resolve()
     
     # Build MLX command with environment to suppress progress bars
     cmd = ["mlx_lm.lora", "--config", config_path, "--train"]
@@ -316,6 +373,8 @@ def monitor_training_output(config_path: str):
     print(f"Command: {' '.join(cmd)}")
     print("\nNote: Decoded outputs will be shown at each validation step.")
     print(f"Validation frequency: every {monitor.config.get('steps_per_eval', 200)} iterations\n")
+    if not monitor.monitor_enabled:
+        print("Decoded validation outputs are disabled by configuration.\n")
     
     # Pattern to match validation output
     val_pattern = re.compile(r'Iter (\d+):.*Val loss ([\d.]+)')
@@ -359,15 +418,33 @@ def monitor_training_output(config_path: str):
                 pending_validation = (iteration, val_loss)
 
                 # Run initial validation after Iter 1, only once
-                if not ran_initial_validation and iteration == 1:
+                if (
+                    monitor.monitor_enabled
+                    and monitor.monitor_initial_validation
+                    and not ran_initial_validation
+                    and iteration == 1
+                ):
                     ran_initial_validation = True
                     print(f"Initial validation (iteration {iteration}), using base model without adapters")
-                    if monitor.load_model_with_adapter(None):
-                        monitor.generate_outputs(iteration, val_loss)
+                    returncode = run_validation_subprocess(
+                        script_path=script_path,
+                        config_path=config_path,
+                        iteration=iteration,
+                        val_loss=val_loss,
+                        env=env,
+                        adapter_path=None,
+                    )
+                    if returncode != 0:
+                        print(
+                            "Decoded validation failed in a helper process "
+                            f"(exit code {returncode}). Disabling further decoded validation "
+                            "so training can continue."
+                        )
+                        monitor.monitor_enabled = False
 
             # Check for saved adapter
             save_match = save_pattern.search(line)
-            if save_match and pending_validation:
+            if save_match and pending_validation and monitor.monitor_enabled:
                 last_saved_adapter = save_match.group(1)
                 iteration, val_loss = pending_validation
                 pending_validation = None
@@ -377,12 +454,32 @@ def monitor_training_output(config_path: str):
                 # Load model and generate outputs
                 if adapter_dir.exists() and (adapter_dir / "adapters.safetensors").exists():
                     print(f"Using adapter directory: {adapter_dir}")
-                    if monitor.load_model_with_adapter(str(adapter_dir)):
-                        monitor.generate_outputs(iteration, val_loss)
+                    returncode = run_validation_subprocess(
+                        script_path=script_path,
+                        config_path=config_path,
+                        iteration=iteration,
+                        val_loss=val_loss,
+                        env=env,
+                        adapter_path=str(adapter_dir),
+                    )
                 else:
                     print(f"No adapter directory found at iteration {iteration}, using base model")
-                    if monitor.load_model_with_adapter(None):
-                        monitor.generate_outputs(iteration, val_loss)
+                    returncode = run_validation_subprocess(
+                        script_path=script_path,
+                        config_path=config_path,
+                        iteration=iteration,
+                        val_loss=val_loss,
+                        env=env,
+                        adapter_path=None,
+                    )
+
+                if returncode != 0:
+                    print(
+                        "Decoded validation failed in a helper process "
+                        f"(exit code {returncode}). Disabling further decoded validation "
+                        "so training can continue."
+                    )
+                    monitor.monitor_enabled = False
 
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user.")
@@ -409,6 +506,27 @@ def main():
         required=True,
         help="Path to YAML configuration file"
     )
+    parser.add_argument(
+        "--run-single-validation",
+        action="store_true",
+        help="Internal mode: run one decoded validation pass and exit",
+    )
+    parser.add_argument(
+        "--iteration",
+        type=int,
+        help="Iteration number for single validation mode",
+    )
+    parser.add_argument(
+        "--val-loss",
+        type=float,
+        help="Validation loss for single validation mode",
+    )
+    parser.add_argument(
+        "--adapter-path",
+        type=str,
+        default=None,
+        help="Adapter directory for single validation mode",
+    )
     
     args = parser.parse_args()
     
@@ -417,7 +535,18 @@ def main():
     if not config_path.exists():
         print(f"Error: Configuration file not found: {config_path}")
         return 1
-        
+
+    if args.run_single_validation:
+        if args.iteration is None or args.val_loss is None:
+            print("Error: --iteration and --val-loss are required in single validation mode")
+            return 1
+        return run_single_validation(
+            str(config_path),
+            iteration=args.iteration,
+            val_loss=args.val_loss,
+            adapter_path=args.adapter_path,
+        )
+
     # Run monitoring
     return monitor_training_output(str(config_path))
 

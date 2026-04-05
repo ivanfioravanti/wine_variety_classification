@@ -4,7 +4,7 @@ model: "mlx-community/Qwen3-0.6B-bf16"
 # train: true
 
 # Directory with {train, valid, test}.jsonl files
-data: "/Users/ifioravanti/projects/wine_variety_classification/train/data"
+data: "/Users/ljoana/repos/wine_variety_classification/train/data"
 
 # The PRNG seed
 seed: 123
@@ -64,7 +64,7 @@ optimizer_config:
 lora_parameters:
   # The layer keys to apply LoRA to.
   # These will be applied for the last lora_layers
-  keys: [self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.down_proj","mlp.up_proj"]
+  keys: ["self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.down_proj", "mlp.up_proj"]
   rank: 32
   scale: 2
   dropout: 0
@@ -78,6 +78,8 @@ lr_schedule:
 
 wandb: "mlx-finetuning"
 
-monitor_batch_size: 25
-monitor_sample_size: 100
-monitor_max_tokens: 32
+monitor_enabled: true
+monitor_initial_validation: false
+monitor_batch_size: 1
+monitor_sample_size: 5
+monitor_max_tokens: 16
