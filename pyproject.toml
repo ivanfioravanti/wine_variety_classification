@@ -30,9 +30,8 @@ package = true
 include = ["providers*", "train*"]
 
 [tool.setuptools]
-py-modules = ["config", "data_utils", "final_plot", "wine_all"]
+py-modules = ["config", "data_utils", "credit_data_utils", "final_plot", "wine_all"]
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
-
