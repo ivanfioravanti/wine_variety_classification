@@ -183,6 +183,33 @@ python wine_all.py --no-provider-csv                         # Run tests but don
 ## Fine-tuning models with MLX
 See [LORA.md](LORA.md) for instructions on how to fine-tune models using LoRA with MLX.
 
+## Autonomous Hyperparameter Search
+
+Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch), this project includes an autonomous hyperparameter search that lets an AI agent iteratively tune LoRA training parameters overnight.
+
+### How it works
+
+- **`program.md`** — Agent instructions defining the search loop, hyperparameter ranges, and logging format. Point your coding agent here.
+- **`results/hp_search.jsonl`** — Experiment log. One JSON line per run with all params and accuracy.
+- **`train/lora_training_monitor.py`** — Emits a structured `HPSEARCH_RESULT|accuracy=...|val_loss=...` line at the end of each training run for easy parsing.
+
+The agent modifies `train/gemma_lora_config.yaml`, runs a short training (300 iters), checks accuracy, logs the result, and repeats — sweeping one parameter at a time.
+
+### Quick start
+
+```bash
+# 1. Run a baseline to establish a starting accuracy
+python ./train/lora_training_monitor.py -c ./train/gemma_lora_config.yaml
+
+# 2. Point your coding agent (Claude, Codex, etc.) at the repo and say:
+#    "Read program.md and start the hyperparameter search"
+
+# 3. Check results at any time
+cat results/hp_search.jsonl
+```
+
+See [program.md](program.md) for the full search space and strategy details.
+
 ## TODO
 
 ## DONE
