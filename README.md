@@ -31,12 +31,13 @@ The project uses a dataset of Italian wines to test different LLMs' ability to p
 - Wine variety prediction using multiple LLM providers:
   - [Ollama](https://ollama.ai)
   - [OpenAI](https://openai.com)
-  - [Google Gemini](https://gemini.google.com)
+  - [Google Gemini](https://gemini.google.com) (via `google-genai` SDK)
   - [LM Studio](https://lmstudio.ai)
   - [OpenRouter](https://openrouter.ai)
   - [DeepSeek](https://deepseek.com)
   - [Anthropic](https://anthropic.com)
   - [MLX Omni Server](https://github.com/madroidmaq/mlx-omni-server)
+  - [MLX Batch Inference](https://github.com/ml-explore/mlx) (local fine-tuned models)
 - Structured Output implementation for consistent responses (where possible)
 - Performance comparison between different models
 - Support for parallel processing with some providers
@@ -86,16 +87,20 @@ If you already have local copies of the Kaggle CSVs, they can remain in place; t
 - `wine_all.py` - Implementation using all providers
 
 In the providers folder you will find the individual implementations for each provider.
-- `openrouter.py` - Implementation using OpenRouter API
-- `ollama.py` - Implementation using Ollama
-- `gemini.py` - Implementation using Google Gemini
-- `lmstudio.py` - Implementation using LM Studio
-- `deepseek.py` - Implementation using DeepSeek
 - `anthropic.py` - Implementation using Anthropic
-- `openai.py` - Implementation using OpenAI (Structured)
-- `openai_unstructured.py` - Implementation using OpenAI with unstructured processing.
-
+- `deepseek.py` - Implementation using DeepSeek
+- `gemini_genai.py` - Implementation using Google Gemini (google-genai SDK)
+- `gemini_openai.py` - Implementation using Google Gemini (OpenAI-compatible API)
+- `lmstudio.py` - Implementation using LM Studio
+- `mlx_batch.py` - Batch inference with MLX fine-tuned models
 - `mlx_omni_server.py` - Implementation using MLX Omni Server
+- `mlx_server_unstructured.py` - Unstructured inference via MLX Omni Server
+- `ollama.py` - Implementation using Ollama
+- `openai.py` - Implementation using OpenAI (Structured)
+- `openai_batching.py` - Implementation using OpenAI with batched requests
+- `openai_unstructured.py` - Implementation using OpenAI with unstructured processing
+- `openrouter.py` - Implementation using OpenRouter API
+- `wine_mlx_batch.py` - Wine-specific MLX batch inference helper
 
 ## Usage
 
@@ -110,10 +115,14 @@ In the providers folder you will find the individual implementations for each pr
    ```bash
    python -m train.generate_data
    ```
-4. Run MLX LoRA training with live validation monitoring for `mlx-community/Qwen3-0.6B-bf16`:
+4. Run MLX LoRA training with live validation monitoring. Choose a config for your target model:
    ```bash
+   # Qwen3 0.6B
    python ./train/lora_training_monitor.py -c ./train/qwen_lora_config.yaml
+   # Gemma 4 e2B
+   python ./train/lora_training_monitor.py -c ./train/gemma_lora_config.yaml
    ```
+   See `train/` for additional configs (Phi-4, Llama 3.3, Mistral, etc.).
 5. (Optional) Run the Jupyter notebook or individual Python scripts for provider comparisons
 
 ### Running Individual Providers
@@ -136,16 +145,19 @@ python -m providers.openai
 # Run OpenAI Unstructured provider
 python -m providers.openai_unstructured
 
+# Run OpenAI Batching provider
+python -m providers.openai_batching
 
 # Run Anthropic provider
 python -m providers.anthropic
 
+# Run Gemini provider (google-genai SDK)
+python -m providers.gemini_genai
+
 # Run other providers similarly:
-python -m providers.gemini
 python -m providers.deepseek
 python -m providers.lmstudio
 python -m providers.openrouter
-
 ```
 
 You can override the default MLX batch configuration by passing the model name and adapter path explicitly:
@@ -173,12 +185,13 @@ See [LORA.md](LORA.md) for instructions on how to fine-tune models using LoRA wi
 
 ## TODO
 
-- [ ] Test google-genai python package for Gemini
-
 ## DONE
 
 - [x] Try [MLX Omni Server](https://github.com/madroidmaq/mlx-omni-server) for Apple MLX tests
-- [x] Fine tune models with MLX with distillation (Phi-3.5-mini-instruct) 
+- [x] Fine tune models with MLX with distillation (Phi-3.5-mini-instruct)
+- [x] Test google-genai python package for Gemini
+- [x] Add Gemma 4 LoRA training config
+- [x] Add MLX batch inference provider
 
 ## Contributing
 
@@ -191,4 +204,4 @@ Feel free to open issues or submit pull requests with improvements.
 ## Acknowledgments
 
 - Inspired by [OpenAI's model distillation cookbook](https://cookbook.openai.com/examples/leveraging_model_distillation_to_fine-tune_a_model)
-- Uses the Kaggle Wine Reviews dataset 
+- Uses the [spawn99/wine-reviews](https://huggingface.co/datasets/spawn99/wine-reviews) dataset from Hugging Face

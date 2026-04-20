@@ -1,7 +1,5 @@
 # The path to the local model directory or Hugging Face repo.
-model: "mlx-community/Qwen3-0.6B-bf16"
-# Whether or not to train (boolean)
-# train: true
+model: "mlx-community/gemma-4-e2b-it-bf16"
 
 # Directory with {train, valid, test}.jsonl files
 data: "/Users/ifioravanti/github/wine_variety_classification/train/data"
@@ -18,22 +16,19 @@ num_layers: -1
 batch_size: 4
 
 # Iterations to train for.
-iters: 4000
+iters: 300
 
 # Number of validation batches, -1 uses the entire validation set.
 val_batches: 10
 
 # Adam learning rate.
-learning_rate: 1e-5
+learning_rate: 2e-4
 
 # Number of training steps between loss reporting.
 steps_per_report: 10
 
 # Number of training steps between validations.
 steps_per_eval: 100
-
-# Load path to resume training with the given adapter weights.
-# resume_adapter_file: "/Users/ifioravanti/adapters/adapters.safetensors"
 
 # Save/load path for the trained adapter weights.
 adapter_path: "adapters"
@@ -60,21 +55,19 @@ optimizer_config:
     weight_decay: 0.05
     bias_correction: true
 
-# LoRA parameters can only be specified in a config file
+# LoRA parameters
 lora_parameters:
-  # The layer keys to apply LoRA to.
-  # These will be applied for the last lora_layers
-  keys: [self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.down_proj","mlp.up_proj"]
+  keys: ["self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.down_proj", "mlp.up_proj"]
   rank: 32
   scale: 2
   dropout: 0
 
-# Schedule can only be specified in a config file, uncomment to use.
+# Learning rate schedule
 lr_schedule:
   name: cosine_decay
-  warmup: 100 # 0 for no warmup
-  warmup_init: 1e-4 # 0 if not specified
-  arguments: [4e-4, 400, 1e-4] # passed to scheduler
+  warmup: 100
+  warmup_init: 1e-4
+  arguments: [4e-4, 400, 1e-4]
 
 wandb: "mlx-finetuning"
 

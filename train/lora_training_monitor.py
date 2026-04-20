@@ -75,11 +75,19 @@ class ValidationMonitor:
                     messages.append({"role": "system", "content": self.monitor_system_prompt})
                 messages.append({"role": "user", "content": prompt})
 
-                rendered = self.tokenizer.apply_chat_template(
-                    messages,
-                    add_generation_prompt=True,
-                    tokenize=False,
-                )
+                try:
+                    rendered = self.tokenizer.apply_chat_template(
+                        messages,
+                        add_generation_prompt=True,
+                        tokenize=False,
+                        enable_thinking=False,
+                    )
+                except TypeError:
+                    rendered = self.tokenizer.apply_chat_template(
+                        messages,
+                        add_generation_prompt=True,
+                        tokenize=False,
+                    )
                 input_ids = self.tokenizer.encode(rendered, add_special_tokens=False)
             else:
                 combined = prompt
@@ -136,6 +144,17 @@ class ValidationMonitor:
                 return value.strip()
         except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
             pass
+
+        start = expected.find("{")
+        end = expected.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            snippet = expected[start : end + 1]
+            try:
+                value = json.loads(snippet).get("variety")
+                if isinstance(value, str):
+                    return value.strip()
+            except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+                pass
 
         return expected.strip().strip('"').strip('\'')
                     
@@ -200,7 +219,15 @@ class ValidationMonitor:
 
         selected_samples = random.sample(self.validation_samples, sample_count)
 
-        prompts = [sample.get("prompt", "").strip() for sample in selected_samples]
+        prompts = []
+        for sample in selected_samples:
+            prompt = sample.get("prompt", "").strip()
+            if not prompt and "messages" in sample:
+                for msg in sample["messages"]:
+                    if msg.get("role") == "user":
+                        prompt = msg["content"].strip()
+                        break
+            prompts.append(prompt)
         valid_indices = [i for i, prompt in enumerate(prompts) if prompt]
 
         if not valid_indices:
@@ -235,6 +262,11 @@ class ValidationMonitor:
         for idx, (sample, response_text) in enumerate(zip(samples_to_run, responses.texts)):
             prompt = prompts_to_run[idx]
             expected_raw = sample.get("completion", "").strip()
+            if not expected_raw and "messages" in sample:
+                for msg in sample["messages"]:
+                    if msg.get("role") == "assistant":
+                        expected_raw = msg["content"].strip()
+                        break
             expected_variety = self._parse_expected_variety(expected_raw) or ""
 
             candidate_text = response_text.strip() if response_text else ""
@@ -299,6 +331,8 @@ class ValidationMonitor:
 
         print(f"{'='*80}\n")
 
+        return accuracy
+
 
 def monitor_training_output(config_path: str):
     """Monitor MLX training output and inject validation outputs."""
@@ -333,8 +367,13 @@ def monitor_training_output(config_path: str):
     
     last_saved_adapter = None
     adapter_dir = Path(monitor.config.get("adapter_path", "adapters"))
-    pending_validation = None  # Store (iteration, val_loss) until after save
-    ran_initial_validation = False  # Track if we've run the initial validation
+    pending_validation = None
+    ran_initial_validation = False
+    best_accuracy = 0.0
+    best_iteration = 0
+    best_val_loss = float("inf")
+    last_accuracy = 0.0
+    last_val_loss = float("inf")
     
     try:
         suppress_next_warning_line = False
@@ -363,7 +402,14 @@ def monitor_training_output(config_path: str):
                     ran_initial_validation = True
                     print(f"Initial validation (iteration {iteration}), using base model without adapters")
                     if monitor.load_model_with_adapter(None):
-                        monitor.generate_outputs(iteration, val_loss)
+                        acc = monitor.generate_outputs(iteration, val_loss)
+                        if acc is not None:
+                            last_accuracy = acc
+                            last_val_loss = val_loss
+                            if acc > best_accuracy:
+                                best_accuracy = acc
+                                best_iteration = iteration
+                                best_val_loss = val_loss
 
             # Check for saved adapter
             save_match = save_pattern.search(line)
@@ -378,24 +424,47 @@ def monitor_training_output(config_path: str):
                 if adapter_dir.exists() and (adapter_dir / "adapters.safetensors").exists():
                     print(f"Using adapter directory: {adapter_dir}")
                     if monitor.load_model_with_adapter(str(adapter_dir)):
-                        monitor.generate_outputs(iteration, val_loss)
+                        acc = monitor.generate_outputs(iteration, val_loss)
+                        if acc is not None:
+                            last_accuracy = acc
+                            last_val_loss = val_loss
+                            if acc > best_accuracy:
+                                best_accuracy = acc
+                                best_iteration = iteration
+                                best_val_loss = val_loss
                 else:
                     print(f"No adapter directory found at iteration {iteration}, using base model")
                     if monitor.load_model_with_adapter(None):
-                        monitor.generate_outputs(iteration, val_loss)
+                        acc = monitor.generate_outputs(iteration, val_loss)
+                        if acc is not None:
+                            last_accuracy = acc
+                            last_val_loss = val_loss
+                            if acc > best_accuracy:
+                                best_accuracy = acc
+                                best_iteration = iteration
+                                best_val_loss = val_loss
 
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user.")
         process.terminate()
         
-    # Wait for process to complete
     process.wait()
-    
+
     if process.returncode == 0:
         print("\n✅ Training completed successfully!")
     else:
         print(f"\n❌ Training failed with return code: {process.returncode}")
-        
+        return process.returncode
+
+    hpsearch_line = (
+        f"HPSEARCH_RESULT|accuracy={last_accuracy:.4f}"
+        f"|val_loss={last_val_loss:.4f}"
+        f"|best_accuracy={best_accuracy:.4f}"
+        f"|best_iteration={best_iteration}"
+        f"|config={config_path}"
+    )
+    print(hpsearch_line)
+
     return process.returncode
 
 
