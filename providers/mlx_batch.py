@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from config import COUNTRY, RANDOM_SEED
-from data_utils import prepare_wine_data
+from data_utils import SYSTEM_PROMPT, prepare_wine_data
 
 try:
     from mlx_lm import batch_generate, load
@@ -25,11 +25,6 @@ except ImportError as exc:  # pragma: no cover - handled at runtime
 
 PROMPT_COLUMN = "prompt"
 DEFAULT_MODEL = "mlx-community/Qwen3-0.6B-bf16"
-SYSTEM_PROMPT = (
-    "You're a sommelier expert and you know everything about wine. "
-    "You answer precisely with the name of the variety/blend in JSON format: "
-    '{"variety": "<answer>"}.'
-)
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_MAX_TOKENS = 64
 

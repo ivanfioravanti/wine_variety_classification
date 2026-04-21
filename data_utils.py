@@ -7,6 +7,12 @@ from config import COUNTRY, SAMPLE_SIZE, RANDOM_SEED
 
 PROMPT_COLUMN = "prompt"
 
+SYSTEM_PROMPT = (
+    "You're a sommelier expert and you know everything about wine. "
+    "You answer precisely with the name of the variety/blend in JSON format: "
+    '{"variety": "<answer>"}.'
+)
+
 
 def _format_field(value, fallback: str = "unknown") -> str:
     if value is None:

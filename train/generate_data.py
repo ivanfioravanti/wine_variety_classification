@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from config import COUNTRY
+from data_utils import SYSTEM_PROMPT, build_prompt
 import json
 import random
 import argparse
@@ -59,28 +60,15 @@ df_filtered = df_filtered[~df_filtered["variety"].isin(varieties_less_than_five_
 
 
 def create_wine_sample(row):
-    # Handle potential missing values with empty strings to avoid None errors
-    winery = row.get("winery", "")
-    province = row.get("province", "")
-    country = row.get("country", "")
-    region_1 = row.get("region_1", "")
-    description = row.get("description", "")
-    taster_name = row.get("taster_name", "")
-    points = row.get("points", "")
-    price = row.get("price", "")
-
-    prompt = f"""/no_think
-Based on this wine review, guess the grape variety:
-This wine is produced by {winery} in the {province} region of {country}.
-It was grown in {region_1}. It is described as: "{description}".
-The wine has been reviewed by {taster_name} and received {points} points.
-The price is {price}"""
-
-    completion_template = {
-        "variety": row["variety"],
+    user_content = build_prompt(row)
+    assistant_content = json.dumps({"variety": row["variety"]})
+    return {
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+            {"role": "assistant", "content": assistant_content},
+        ]
     }
-    completion = "<think>\n\n</think>\n\n" + json.dumps(completion_template)
-    return {"prompt": prompt, "completion": completion}
 
 
 print("Processing wine data...")

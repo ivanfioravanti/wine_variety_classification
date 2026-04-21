@@ -81,4 +81,5 @@ lr_schedule:
   warmup_init: 5e-5 # 0 if not specified
   arguments: [1e-4, 500, 5e-5] # passed to scheduler
 
-wandb: "mlx-finetuning-mistral"
+report_to: "wandb"
+project_name: "mlx-finetuning-mistral"

@@ -16,7 +16,7 @@ num_layers: -1
 batch_size: 8
 
 # Iterations to train for.
-iters: 4000
+iters: 2000
 
 # Number of validation batches, -1 uses the entire validation set.
 val_batches: 10
@@ -43,7 +43,7 @@ test: false
 test_batches: 100
 
 # Maximum sequence length.
-max_seq_length: 256
+max_seq_length: 512
 
 # Use gradient checkpointing to reduce memory use.
 grad_checkpoint: false
@@ -70,7 +70,8 @@ lr_schedule:
   warmup_init: 1e-4
   arguments: [4e-4, 400, 1e-4]
 
-wandb: "mlx-finetuning"
+report_to: "wandb"
+project_name: "mlx-finetuning"
 
 monitor_batch_size: 25
 monitor_sample_size: 100

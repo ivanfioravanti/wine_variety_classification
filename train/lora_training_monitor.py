@@ -21,6 +21,8 @@ import mlx.core as mx
 import yaml
 from mlx_lm import batch_generate, load
 
+from data_utils import SYSTEM_PROMPT
+
 # Suppress tqdm progress bars
 os.environ['TQDM_DISABLE'] = '0'
 
@@ -38,7 +40,9 @@ class ValidationMonitor:
         self.monitor_batch_size = int(self.config.get("monitor_batch_size", 50))
         self.monitor_max_tokens = int(self.config.get("monitor_max_tokens", 64))
         self.monitor_sample_size = int(self.config.get("monitor_sample_size", 100))
-        self.monitor_system_prompt = self.config.get("monitor_system_prompt")
+        self.monitor_system_prompt = self.config.get(
+            "monitor_system_prompt", SYSTEM_PROMPT
+        )
         self._load_validation_samples()
         
     def _load_config(self):

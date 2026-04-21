@@ -76,7 +76,8 @@ lr_schedule:
   warmup_init: 1e-4 # 0 if not specified
   arguments: [4e-4, 400, 1e-4] # passed to scheduler
 
-wandb: "mlx-finetuning"
+report_to: "wandb"
+project_name: "mlx-finetuning"
 
 monitor_batch_size: 25
 monitor_sample_size: 100
