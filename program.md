@@ -69,7 +69,15 @@ These are the hyperparameters you should explore and their valid ranges:
 | LR warmup steps | `lr_schedule.warmup` | 100 | 30, 50, 100, 150 |
 | LR warmup init | `lr_schedule.warmup_init` | 1e-4 | 1e-5, 1e-4, 1e-3 |
 | LR decay args | `lr_schedule.arguments` | [4e-4, 400, 1e-4] | vary decay endpoints |
-| Max sequence length | `max_seq_length` | 256 | 128, 256, 512 |
+| Max sequence length | `max_seq_length` | 256 | 256 (fixed) |
+| Optimizer | `optimizer` | adam | adam, adamw, muon, sgd, adafactor |
+| Optimizer config | `optimizer_config` | see below | per-optimizer settings (see below) |
+| Fine-tune type | `fine_tune_type` | lora | lora |
+| LoRA dropout | `lora_parameters.dropout` | 0.0 | 0.0, 0.05, 0.1 |
+| Grad accumulation | `grad_accumulation_steps` | 1 | 1, 2, 4 |
+| Grad checkpointing | `grad_checkpoint` | false | true, false |
+| Mask prompt | `mask_prompt` | false | true, false |
+| Steps per eval | `steps_per_eval` | 100 | 50, 100, 200 |
 
 ### LoRA keys subsets to try
 
@@ -77,6 +85,65 @@ These are the hyperparameters you should explore and their valid ranges:
 - **Attention only**: `["self_attn.k_proj", "self_attn.v_proj", "self_attn.q_proj", "self_attn.o_proj"]`
 - **MLP only**: `["mlp.gate_proj", "mlp.down_proj", "mlp.up_proj"]`
 - **QKV only**: `["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj"]`
+
+### Optimizer-specific configurations
+
+The `optimizer_config` block should match the selected optimizer. Example configs:
+
+**AdamW (default):**
+```yaml
+optimizer: adamw
+optimizer_config:
+  adamw:
+    betas: [0.9, 0.98]
+    eps: 1e-6
+    weight_decay: 0.05
+    bias_correction: true
+```
+
+**Adam:**
+```yaml
+optimizer: adam
+optimizer_config:
+  adam:
+    betas: [0.9, 0.98]
+    eps: 1e-6
+    bias_correction: true
+```
+
+**Muon:**
+```yaml
+optimizer: muon
+optimizer_config:
+  muon:
+    momentum: 0.9
+    nesterov: true
+```
+
+**SGD:**
+```yaml
+optimizer: sgd
+optimizer_config:
+  sgd:
+    momentum: 0.9
+    nesterov: true
+    weight_decay: 0.0
+```
+
+**Adafactor:**
+```yaml
+optimizer: adafactor
+optimizer_config:
+  adafactor:
+    eps: [1e-30, 1e-3]
+    decay_rate: -0.8
+    weight_decay: 0.0
+    clip_threshold: 1.0
+```
+
+### Fine-tune type variants
+
+- **LoRA** (baseline): Standard LoRA adaptation. Only fine-tune type used in this search.
 
 ## Strategy guidelines
 
@@ -89,19 +156,23 @@ These are the hyperparameters you should explore and their valid ranges:
 - **Never change iters**: Always keep `iters: 200` during the search phase.
 - **Revert on failure**: If training crashes or produces NaN loss, revert to the last working config and try a different change.
 - **Clean adapters**: Delete the `adapters/` directory before each new run to avoid loading stale weights: `rm -rf adapters/`
+- **Optimizer sweeps**: When testing a new optimizer, keep all other params fixed to the best-known config and only vary the optimizer (and its `optimizer_config`). Muon and Adafactor are promising alternatives to AdamW.
+
+- **Dropout for overfitting**: If validation accuracy is significantly lower than training accuracy or peaks early then degrades, try `lora_parameters.dropout: 0.05` or `0.1`.
+- **Gradient accumulation**: Use `grad_accumulation_steps` to simulate larger batch sizes when memory is constrained. For example, `batch_size: 4` + `grad_accumulation_steps: 2` = effective batch size of 8.
+- **Mask prompt**: Setting `mask_prompt: true` excludes the prompt/instruction tokens from loss computation, which can improve learning efficiency on the actual labels.
+- **Eval frequency**: Lower `steps_per_eval` (e.g., 50) gives finer-grained tracking but slows training. Keep at 100 for search, consider 50 for the final run.
 
 ## Fixed parameters (do NOT change)
 
 - `model`: `mlx-community/gemma-4-e2b-it-bf16`
 - `data`: the training data path
 - `seed`: 123
-- `fine_tune_type`: lora
 - `iters`: 200 (during search)
 - `adapter_path`: `adapters`
 - `save_every`: 100
-- `grad_checkpoint`: false
-- `dropout`: 0
-- `optimizer_config`: keep the existing AdamW config
+- `test_batches`: -1 (use full test set when `test: true`)
+- `val_batches`: 10 (keep at 10–20 max to save time; do NOT use -1)
 
 ## Success metric
 
